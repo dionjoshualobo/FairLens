@@ -1374,11 +1374,11 @@ class ModelGovernanceAnalyzer:
                         st.write("*Note: This shows how each feature impacts the model's predictions*")
                         
                         # Create SHAP summary plot
-                        fig_shap, ax = plt.subplots(figsize=(10, 6))
+                        plt.figure(figsize=(10, 6))
                         shap.summary_plot(shap_values_to_plot, X_sample, 
                                         feature_names=feature_names, 
-                                        plot_type="dot", show=False, ax=ax)
-                        st.pyplot(fig_shap)
+                                        plot_type="dot", show=False)
+                        st.pyplot(plt.gcf())
                         plt.close()
                         
                     except Exception as plot_error:
