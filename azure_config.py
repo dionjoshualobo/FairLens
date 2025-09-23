@@ -4,7 +4,7 @@ Contains all Azure service configurations and connection strings
 """
 
 import os
-from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
+from azure.identity import DefaultAzureCredential, ManagedIdentityCredential, ClientSecretCredential
 from azure.storage.blob import BlobServiceClient
 from azure.ai.ml import MLClient
 import streamlit as st
@@ -20,28 +20,42 @@ class AzureConfig:
         self.RESOURCE_GROUP_NAME = os.getenv('AZURE_RESOURCE_GROUP_NAME', 'fairlens-rg')
         self.WORKSPACE_NAME = os.getenv('AZURE_ML_WORKSPACE_NAME', 'fairlens-ml-workspace')
         
+        # Service Principal Configuration (from environment variables only)
+        self.AZURE_CLIENT_ID = os.getenv('AZURE_CLIENT_ID')
+        self.AZURE_CLIENT_SECRET = os.getenv('AZURE_CLIENT_SECRET')
+        self.AZURE_TENANT_ID = os.getenv('AZURE_TENANT_ID')
+        
         # Initialize Azure credentials with fallback
         self.credential = self._get_credential()
         
     def _get_credential(self):
-        """Get Azure credential with container environment detection"""
-        # Check if we're running in a container environment without proper Azure credentials
-        if os.getenv('WEBSITE_SITE_NAME') or os.getenv('CONTAINER_NAME') or not os.getenv('AZURE_CLIENT_ID'):
-            print("Container environment detected. Running in demo mode without Azure authentication.")
-            return None
+        """Get Azure credential with service principal authentication"""
+        try:
+            # Try Service Principal first (production authentication)
+            if self.AZURE_CLIENT_ID and self.AZURE_CLIENT_SECRET and self.AZURE_TENANT_ID:
+                print("Using Service Principal authentication")
+                return ClientSecretCredential(
+                    tenant_id=self.AZURE_TENANT_ID,
+                    client_id=self.AZURE_CLIENT_ID,
+                    client_secret=self.AZURE_CLIENT_SECRET
+                )
+        except Exception as e:
+            print(f"Service Principal authentication failed: {e}")
+        
+        try:
+            # Try Managed Identity (for Azure environments)
+            return ManagedIdentityCredential()
+        except Exception as e:
+            print(f"Managed Identity authentication failed: {e}")
             
         try:
-            # Only try authentication if we have proper credentials configured
-            return DefaultAzureCredential(
-                exclude_managed_identity_credential=True,  # Skip the slow IMDS check
-                exclude_shared_token_cache_credential=True,
-                exclude_visual_studio_code_credential=True,
-                exclude_azure_cli_credential=True,
-                exclude_environment_credential=False,  # Keep this for potential future use
-            )
+            # Fallback to DefaultAzureCredential
+            return DefaultAzureCredential()
         except Exception as e:
-            print(f"Warning: Azure authentication failed. Running in demo mode. Error: {e}")
-            return None
+            print(f"Default Azure Credential failed: {e}")
+            
+        print("All authentication methods failed. Running in demo mode.")
+        return None
         
     def get_blob_service_client(self):
         """Get Azure Blob Service client"""
