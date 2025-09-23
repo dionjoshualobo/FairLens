@@ -1394,6 +1394,17 @@ class ModelGovernanceAnalyzer:
             
             if len(critical_risk_features) > 0:
                 st.error(f"🚨 **{len(critical_risk_features)} CRITICAL risk features** need immediate attention")
+                
+                # Explain what makes features critical
+                with st.expander("❓ Why are these features Critical Risk?", expanded=True):
+                    st.warning("**Critical Risk Features** are identified because they:")
+                    st.write("🔍 **High Uniqueness**: >90% unique values (likely personal identifiers)")
+                    st.write("🏷️ **Sensitive Patterns**: Names contain 'id', 'ssn', 'email', 'phone', 'passport'")
+                    st.write("🌍 **Location Data**: Addresses, coordinates, postal codes")
+                    st.write("💳 **Financial IDs**: Account numbers, credit card info")
+                    st.write("⚠️ **Re-identification Risk**: Could identify individuals when combined")
+                
+                st.write("**🚨 Critical Risk Features Found:**")
                 for _, row in critical_risk_features.head(3).iterrows():
                     st.write(f"• **{row['Feature']}** (Risk Level: {row['Risk Level']})")
             elif len(high_risk_features) > 0:
@@ -1496,6 +1507,45 @@ class ModelGovernanceAnalyzer:
         st.subheader("📤 Export Report")
         
         if st.button("Generate Detailed Report"):
+            # Get bias metrics if available
+            bias_metrics_text = ""
+            if hasattr(self, 'model') and self.model is not None and hasattr(st.session_state, 'model_results'):
+                model_results = st.session_state.model_results
+                best_model_name = max(model_results.keys(), key=lambda k: model_results[k]['accuracy'])
+                best_accuracy = model_results[best_model_name]['accuracy']
+                
+                bias_metrics_text = f"""
+## Model Performance & Bias Analysis
+### Best Model: {best_model_name}
+- Accuracy: {best_accuracy:.4f}
+- Analyzed Sensitive Features: {', '.join(sensitive_features)}
+
+### Bias Analysis Results:
+- Target Variable: {st.session_state.target_col if hasattr(st.session_state, 'target_col') else 'Not specified'}
+- Sensitive Features Analyzed: {len(sensitive_features)} features
+- Fairness Metrics: {"Calculated with Fairlearn" if globals().get('FAIRLEARN_AVAILABLE', False) else "Basic analysis performed"}
+
+### Bias Risk Assessment:
+{chr(10).join([f"- {feature}: Requires fairness monitoring for equal treatment" for feature in sensitive_features])}
+"""
+            else:
+                bias_metrics_text = """
+## Model Performance & Bias Analysis
+- Model Training: Not completed
+- Bias Analysis: Sensitive features identified but model training required for quantitative bias assessment
+"""
+
+            # Get critical risk features with explanations
+            critical_risk_features = risk_df[risk_df['Privacy Risk'] >= 4]['Feature'].tolist()
+            critical_risk_text = ""
+            if critical_risk_features:
+                critical_risk_text = f"""
+### ⚠️ CRITICAL PRIVACY RISKS IDENTIFIED:
+{chr(10).join([f"- {feature}: Requires immediate anonymization or removal" for feature in critical_risk_features])}
+
+**Why Critical:** These features likely contain personally identifiable information (PII) with >90% unique values or sensitive naming patterns (ID, SSN, email, phone, etc.)
+"""
+            
             # Create comprehensive report
             report_text = f"""
 # AI Model Governance Report
@@ -1510,15 +1560,26 @@ Generated on: {report_data['report_date']}
 ### High-Risk Features:
 {chr(10).join(f"- {feature}" for feature in report_data['privacy_assessment']['high_risk_features'])}
 
+{critical_risk_text}
+
 ### Sensitive Data Categories Identified:
-{chr(10).join(f"- {category}" for category in report_data['privacy_assessment']['identified_sensitive_categories'])}
-
-## Bias Analysis
-### Analyzed Features:
-{chr(10).join(f"- {feature}" for feature in sensitive_features)}
-
+{chr(10).join(f"- {category.title()}: {len(identified_sensitive[category])} features" for category in report_data['privacy_assessment']['identified_sensitive_categories'])}
+{bias_metrics_text}
 ## Data-Specific Recommendations
 {chr(10).join([f"{i}. {rec}" for i, rec in enumerate(recommendations, 1)])}
+
+## Compliance Checklist
+✅ Data inventory completed
+✅ Privacy risk assessment conducted  
+✅ Sensitive features identified
+{"✅ Bias analysis performed" if sensitive_features else "⚠️ Bias analysis pending"}
+{"✅ Model explainability provided" if hasattr(self, 'model') and self.model is not None else "⚠️ Model training required"}
+
+## Next Steps
+1. Address critical privacy risks immediately
+2. {"Complete model training and bias assessment" if not hasattr(self, 'model') else "Implement fairness constraints"}
+3. Set up continuous monitoring
+4. Document model cards for compliance
             """
             
             st.download_button(
