@@ -1383,30 +1383,87 @@ class ModelGovernanceAnalyzer:
                     else:
                         st.success("✅ **Low Bias Risk**: No obviously sensitive features in top 10 most important")
                     
-                    # Plot top features
-                    top_features = feature_importance_df.head(10)
-                    fig = px.bar(top_features, x='SHAP_Importance', y='Feature', 
-                                orientation='h', title="Top 10 Feature Importance (SHAP)")
-                    fig.update_layout(yaxis={'categoryorder': 'total ascending'})
-                    st.plotly_chart(fig)
+                    # Plot top features with improved styling
+                    top_features = feature_importance_df.head(8)  # Show only top 8 for cleaner display
                     
-                    st.dataframe(feature_importance_df.head(15))
+                    fig = px.bar(top_features, x='SHAP_Importance', y='Feature', 
+                                orientation='h', 
+                                title="🎯 Top Feature Importance (SHAP)",
+                                color='SHAP_Importance',
+                                color_continuous_scale='viridis')
+                    
+                    fig.update_layout(
+                        yaxis={'categoryorder': 'total ascending'},
+                        height=400,  # Compact height
+                        margin=dict(l=100, r=50, t=50, b=50),
+                        font=dict(size=11),
+                        showlegend=False,
+                        coloraxis_showscale=False
+                    )
+                    
+                    fig.update_traces(
+                        texttemplate='%{x:.3f}', 
+                        textposition='outside',
+                        textfont_size=9
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Show compact feature importance table
+                    st.write("**📋 Detailed Feature Importance:**")
+                    display_df = feature_importance_df.head(10).copy()
+                    display_df['SHAP_Importance'] = display_df['SHAP_Importance'].round(4)
+                    st.dataframe(display_df, use_container_width=True, height=350)
                     
                     # Add SHAP summary plot if possible
                     try:
                         st.subheader("📈 SHAP Summary Plot")
                         st.write("*Note: This shows how each feature impacts the model's predictions*")
                         
-                        # Create SHAP summary plot
-                        plt.figure(figsize=(10, 6))
-                        shap.summary_plot(shap_values_to_plot, X_sample, 
-                                        feature_names=feature_names, 
-                                        plot_type="dot", show=False)
-                        st.pyplot(plt.gcf())
-                        plt.close()
+                        # Create compact SHAP summary plot
+                        fig, ax = plt.subplots(figsize=(8, 4))
+                        
+                        # Use only top 8 features for cleaner display
+                        top_indices = np.argsort(np.abs(shap_values_to_plot).mean(0))[-8:]
+                        shap_values_subset = shap_values_to_plot[:, top_indices]
+                        X_sample_subset = X_sample[:, top_indices]
+                        feature_names_subset = [feature_names[i] for i in top_indices]
+                        
+                        shap.summary_plot(shap_values_subset, X_sample_subset, 
+                                        feature_names=feature_names_subset, 
+                                        plot_type="dot", show=False, ax=ax,
+                                        max_display=8)
+                        
+                        # Improve plot aesthetics
+                        ax.set_xlabel("SHAP value (impact on model output)", fontsize=10)
+                        ax.tick_params(axis='both', which='major', labelsize=9)
+                        plt.tight_layout()
+                        
+                        st.pyplot(fig, use_container_width=True)
+                        plt.close(fig)
                         
                     except Exception as plot_error:
-                        st.info(f"Could not generate SHAP summary plot: {str(plot_error)}")
+                        # Fallback to simpler plot without ax parameter
+                        try:
+                            st.write("*Generating simplified SHAP plot...*")
+                            plt.figure(figsize=(8, 4))
+                            
+                            # Use only top 6 features for even cleaner fallback
+                            top_indices = np.argsort(np.abs(shap_values_to_plot).mean(0))[-6:]
+                            shap_values_subset = shap_values_to_plot[:, top_indices]
+                            X_sample_subset = X_sample[:, top_indices]
+                            feature_names_subset = [feature_names[i] for i in top_indices]
+                            
+                            shap.summary_plot(shap_values_subset, X_sample_subset, 
+                                            feature_names=feature_names_subset, 
+                                            plot_type="dot", show=False)
+                            plt.tight_layout()
+                            st.pyplot(plt.gcf(), use_container_width=True)
+                            plt.close()
+                            
+                        except Exception as fallback_error:
+                            st.info(f"Could not generate SHAP summary plot: {str(plot_error)}")
+                            st.write("*Try using a different model or dataset for SHAP visualization.*")
                     
                     explanation_success = True
                     st.success("✅ SHAP analysis completed successfully!")
