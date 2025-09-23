@@ -18,6 +18,7 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.impute import SimpleImputer, KNNImputer
 
 # Fairness and Bias Detection
 try:
@@ -121,6 +122,320 @@ class ModelGovernanceAnalyzer:
         except Exception as e:
             st.error(f"Error loading data: {str(e)}")
             return False
+    
+    def handle_missing_values(self):
+        """Comprehensive missing value detection and handling"""
+        st.header("🔧 Missing Value Analysis & Handling")
+        
+        if self.data is None:
+            st.warning("Please load data first.")
+            return False
+        
+        # Calculate missing value statistics
+        missing_stats = []
+        total_rows = len(self.data)
+        
+        for col in self.data.columns:
+            missing_count = self.data[col].isnull().sum()
+            missing_pct = (missing_count / total_rows) * 100
+            
+            if missing_count > 0:
+                missing_stats.append({
+                    'Column': col,
+                    'Missing_Count': missing_count,
+                    'Missing_Percentage': missing_pct,
+                    'Data_Type': str(self.data[col].dtype),
+                    'Non_Missing_Count': total_rows - missing_count,
+                    'Unique_Values': self.data[col].nunique()
+                })
+        
+        if not missing_stats:
+            st.success("✅ No missing values found in the dataset!")
+            return True
+        
+        # Display missing value summary
+        st.subheader("📊 Missing Value Summary")
+        missing_df = pd.DataFrame(missing_stats).sort_values('Missing_Percentage', ascending=False)
+        
+        # Color coding based on severity
+        def color_missing_pct(val):
+            if val >= 70:
+                return 'background-color: #ffebee'  # Light red
+            elif val >= 50:
+                return 'background-color: #fff3e0'  # Light orange
+            elif val >= 20:
+                return 'background-color: #f3e5f5'  # Light purple
+            else:
+                return 'background-color: #e8f5e8'  # Light green
+        
+        styled_df = missing_df.style.applymap(color_missing_pct, subset=['Missing_Percentage'])
+        st.dataframe(styled_df, use_container_width=True)
+        
+        # Visual representation
+        fig = px.bar(missing_df, x='Column', y='Missing_Percentage',
+                     title='Missing Values Percentage by Column',
+                     color='Missing_Percentage',
+                     color_continuous_scale='Reds')
+        fig.update_layout(xaxis_tickangle=-45)
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Critical columns analysis
+        st.subheader("⚠️ Critical Missing Value Issues")
+        
+        critical_cols = missing_df[missing_df['Missing_Percentage'] >= 70]['Column'].tolist()
+        high_missing_cols = missing_df[missing_df['Missing_Percentage'] >= 50]['Column'].tolist()
+        moderate_missing_cols = missing_df[missing_df['Missing_Percentage'] >= 20]['Column'].tolist()
+        
+        if critical_cols:
+            st.error(f"🚨 **Critical** (≥70% missing): {', '.join(critical_cols)}")
+            st.write("**Recommendation**: Consider removing these columns as they have too little data to be useful.")
+        
+        if high_missing_cols:
+            st.warning(f"⚠️ **High** (50-70% missing): {', '.join(high_missing_cols)}")
+            st.write("**Recommendation**: Carefully evaluate if these columns are essential. Consider removal or advanced imputation.")
+        
+        if moderate_missing_cols:
+            st.info(f"📝 **Moderate** (20-50% missing): {', '.join(moderate_missing_cols)}")
+            st.write("**Recommendation**: Can be handled with imputation strategies.")
+        
+        # User decision interface
+        st.subheader("🛠️ Missing Value Handling Strategy")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**Automatic Recommendations:**")
+            auto_drop_cols = missing_df[missing_df['Missing_Percentage'] >= 70]['Column'].tolist()
+            if auto_drop_cols:
+                st.write(f"🗑️ **Drop columns** (≥70% missing): {', '.join(auto_drop_cols)}")
+            
+            numerical_cols = missing_df[missing_df['Data_Type'].str.contains('int|float')]['Column'].tolist()
+            categorical_cols = missing_df[~missing_df['Data_Type'].str.contains('int|float')]['Column'].tolist()
+            
+            if numerical_cols:
+                st.write(f"🔢 **Numerical columns** for imputation: {', '.join(numerical_cols)}")
+            if categorical_cols:
+                st.write(f"📝 **Categorical columns** for imputation: {', '.join(categorical_cols)}")
+        
+        with col2:
+            st.write("**Your Choices:**")
+            
+            # Column dropping strategy
+            if critical_cols or high_missing_cols:
+                drop_strategy = st.selectbox(
+                    "Handle high-missing columns:",
+                    [
+                        "Auto-drop columns with ≥70% missing",
+                        "Drop columns with ≥50% missing", 
+                        "Keep all columns and impute",
+                        "Let me choose manually"
+                    ]
+                )
+            else:
+                drop_strategy = "No high-missing columns to drop"
+                st.info("No columns with >50% missing values")
+            
+            # Imputation strategy
+            imputation_strategy = st.selectbox(
+                "Imputation method:",
+                [
+                    "Smart imputation (mean/median for numerical, mode for categorical)",
+                    "Mean/Mode imputation only",
+                    "Median/Mode imputation only", 
+                    "KNN imputation (advanced)",
+                    "Forward fill",
+                    "Backward fill",
+                    "Drop rows with missing values"
+                ]
+            )
+        
+        # Manual column selection if needed
+        if drop_strategy == "Let me choose manually":
+            st.subheader("🎯 Manual Column Selection")
+            st.write("**Select columns to DROP (remove from dataset):**")
+            
+            cols_to_drop = st.multiselect(
+                "Columns to remove:",
+                missing_df['Column'].tolist(),
+                default=auto_drop_cols,
+                help="Select columns you want to remove from the dataset"
+            )
+            
+            if cols_to_drop:
+                st.warning(f"⚠️ You selected to drop: {', '.join(cols_to_drop)}")
+                
+                # Check if target variable suggestions would be affected
+                remaining_cols = [col for col in self.data.columns if col not in cols_to_drop]
+                potential_targets = []
+                for col in remaining_cols:
+                    if col in self.data.columns:
+                        unique_vals = self.data[col].nunique()
+                        if 2 <= unique_vals <= 10:
+                            potential_targets.append(col)
+                
+                if potential_targets:
+                    st.info(f"✅ After dropping, potential target variables remain: {', '.join(potential_targets[:3])}")
+                else:
+                    st.error("❌ Warning: No suitable target variables will remain after dropping these columns!")
+        
+        # Apply the strategy
+        if st.button("🚀 Apply Missing Value Strategy", type="primary"):
+            return self._apply_missing_value_strategy(
+                missing_df, drop_strategy, imputation_strategy, 
+                cols_to_drop if 'cols_to_drop' in locals() else []
+            )
+        
+        return False
+    
+    def _apply_missing_value_strategy(self, missing_df, drop_strategy, imputation_strategy, manual_cols_to_drop):
+        """Apply the selected missing value handling strategy"""
+        
+        original_shape = self.data.shape
+        cols_dropped = []
+        
+        try:
+            # Step 1: Handle column dropping
+            if drop_strategy == "Auto-drop columns with ≥70% missing":
+                cols_to_drop = missing_df[missing_df['Missing_Percentage'] >= 70]['Column'].tolist()
+            elif drop_strategy == "Drop columns with ≥50% missing":
+                cols_to_drop = missing_df[missing_df['Missing_Percentage'] >= 50]['Column'].tolist()
+            elif drop_strategy == "Let me choose manually":
+                cols_to_drop = manual_cols_to_drop
+            else:
+                cols_to_drop = []
+            
+            if cols_to_drop:
+                self.data = self.data.drop(columns=cols_to_drop)
+                cols_dropped = cols_to_drop
+                st.success(f"✅ Dropped {len(cols_to_drop)} columns: {', '.join(cols_to_drop)}")
+            
+            # Step 2: Handle imputation for remaining missing values
+            remaining_missing = self.data.isnull().sum()
+            cols_with_missing = remaining_missing[remaining_missing > 0].index.tolist()
+            
+            if not cols_with_missing:
+                st.success("✅ No missing values remaining after column drops!")
+                self._display_cleaning_summary(original_shape, cols_dropped, 0)
+                return True
+            
+            if imputation_strategy == "Drop rows with missing values":
+                rows_before = len(self.data)
+                self.data = self.data.dropna()
+                rows_dropped = rows_before - len(self.data)
+                st.success(f"✅ Dropped {rows_dropped} rows with missing values")
+                
+            else:
+                # Separate numerical and categorical columns
+                numerical_cols = self.data.select_dtypes(include=[np.number]).columns.tolist()
+                categorical_cols = self.data.select_dtypes(include=['object']).columns.tolist()
+                
+                numerical_missing = [col for col in numerical_cols if col in cols_with_missing]
+                categorical_missing = [col for col in categorical_cols if col in cols_with_missing]
+                
+                # Apply imputation
+                if imputation_strategy == "Smart imputation (mean/median for numerical, mode for categorical)":
+                    # Numerical: use median (more robust to outliers)
+                    if numerical_missing:
+                        imputer_num = SimpleImputer(strategy='median')
+                        self.data[numerical_missing] = imputer_num.fit_transform(self.data[numerical_missing])
+                        st.success(f"✅ Imputed numerical columns with median: {', '.join(numerical_missing)}")
+                    
+                    # Categorical: use most frequent
+                    if categorical_missing:
+                        imputer_cat = SimpleImputer(strategy='most_frequent')
+                        self.data[categorical_missing] = imputer_cat.fit_transform(self.data[categorical_missing])
+                        st.success(f"✅ Imputed categorical columns with mode: {', '.join(categorical_missing)}")
+                
+                elif imputation_strategy == "Mean/Mode imputation only":
+                    if numerical_missing:
+                        imputer_num = SimpleImputer(strategy='mean')
+                        self.data[numerical_missing] = imputer_num.fit_transform(self.data[numerical_missing])
+                        st.success(f"✅ Imputed numerical columns with mean: {', '.join(numerical_missing)}")
+                    
+                    if categorical_missing:
+                        imputer_cat = SimpleImputer(strategy='most_frequent')
+                        self.data[categorical_missing] = imputer_cat.fit_transform(self.data[categorical_missing])
+                        st.success(f"✅ Imputed categorical columns with mode: {', '.join(categorical_missing)}")
+                
+                elif imputation_strategy == "Median/Mode imputation only":
+                    if numerical_missing:
+                        imputer_num = SimpleImputer(strategy='median')
+                        self.data[numerical_missing] = imputer_num.fit_transform(self.data[numerical_missing])
+                        st.success(f"✅ Imputed numerical columns with median: {', '.join(numerical_missing)}")
+                    
+                    if categorical_missing:
+                        imputer_cat = SimpleImputer(strategy='most_frequent')
+                        self.data[categorical_missing] = imputer_cat.fit_transform(self.data[categorical_missing])
+                        st.success(f"✅ Imputed categorical columns with mode: {', '.join(categorical_missing)}")
+                
+                elif imputation_strategy == "KNN imputation (advanced)":
+                    if numerical_missing:
+                        # KNN imputation for numerical columns
+                        imputer_knn = KNNImputer(n_neighbors=5)
+                        self.data[numerical_missing] = imputer_knn.fit_transform(self.data[numerical_missing])
+                        st.success(f"✅ Applied KNN imputation to numerical columns: {', '.join(numerical_missing)}")
+                    
+                    if categorical_missing:
+                        # Use most frequent for categorical
+                        imputer_cat = SimpleImputer(strategy='most_frequent')
+                        self.data[categorical_missing] = imputer_cat.fit_transform(self.data[categorical_missing])
+                        st.success(f"✅ Imputed categorical columns with mode: {', '.join(categorical_missing)}")
+                
+                elif imputation_strategy == "Forward fill":
+                    for col in cols_with_missing:
+                        self.data[col] = self.data[col].ffill()
+                    st.success(f"✅ Applied forward fill to: {', '.join(cols_with_missing)}")
+                
+                elif imputation_strategy == "Backward fill":
+                    for col in cols_with_missing:
+                        self.data[col] = self.data[col].bfill()
+                    st.success(f"✅ Applied backward fill to: {', '.join(cols_with_missing)}")
+            
+            # Final verification
+            final_missing = self.data.isnull().sum().sum()
+            self._display_cleaning_summary(original_shape, cols_dropped, final_missing)
+            
+            if final_missing == 0:
+                st.success("🎉 **Perfect!** No missing values remain in the dataset!")
+                return True
+            else:
+                st.warning(f"⚠️ {final_missing} missing values still remain. You may want to apply additional cleaning.")
+                return True
+                
+        except Exception as e:
+            st.error(f"❌ Error applying missing value strategy: {str(e)}")
+            return False
+    
+    def _display_cleaning_summary(self, original_shape, cols_dropped, final_missing):
+        """Display summary of data cleaning results"""
+        st.subheader("📋 Data Cleaning Summary")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Original Shape", f"{original_shape[0]}×{original_shape[1]}")
+        with col2:
+            st.metric("Final Shape", f"{self.data.shape[0]}×{self.data.shape[1]}")
+        with col3:
+            st.metric("Columns Dropped", len(cols_dropped))
+        with col4:
+            st.metric("Missing Values Left", final_missing)
+        
+        if cols_dropped:
+            st.info(f"🗑️ **Dropped columns**: {', '.join(cols_dropped)}")
+        
+        # Show remaining data quality
+        st.write("**Final Data Quality:**")
+        quality_info = pd.DataFrame({
+            'Metric': ['Total Records', 'Total Features', 'Missing Values', 'Completeness %'],
+            'Value': [
+                len(self.data),
+                len(self.data.columns),
+                final_missing,
+                f"{((1 - final_missing / (len(self.data) * len(self.data.columns))) * 100):.1f}%"
+            ]
+        })
+        st.dataframe(quality_info, use_container_width=True)
     
     def analyze_target_variable(self, target_col):
         """Analyze and prepare target variable for analysis"""
@@ -464,9 +779,33 @@ class ModelGovernanceAnalyzer:
         """Train multiple models for comparison"""
         st.subheader("🤖 Model Training")
         
+        # Check for missing values before training
+        missing_values = self.data.isnull().sum().sum()
+        if missing_values > 0:
+            st.error(f"❌ **Missing values detected** ({missing_values} total)")
+            st.write("**Please handle missing values first before training models.**")
+            
+            # Show which columns have missing values
+            cols_with_missing = self.data.columns[self.data.isnull().any()].tolist()
+            missing_info = pd.DataFrame({
+                'Column': cols_with_missing,
+                'Missing_Count': [self.data[col].isnull().sum() for col in cols_with_missing],
+                'Missing_Percentage': [f"{(self.data[col].isnull().sum() / len(self.data)) * 100:.1f}%" 
+                                     for col in cols_with_missing]
+            })
+            st.dataframe(missing_info)
+            
+            st.info("💡 **Go to Step 1.5: Handle Missing Values** to clean your data first.")
+            return None, None
+        
         # Prepare data
         X = self.data.drop(columns=[target_col])
         y = self.data[target_col]
+        
+        # Check for missing values in target
+        if y.isnull().any():
+            st.error(f"❌ Target variable '{target_col}' has missing values. Please handle this first.")
+            return None, None
         
         # Display target variable distribution
         target_counts = y.value_counts()
@@ -1091,6 +1430,7 @@ def main():
     st.sidebar.title("📋 Analysis Steps")
     steps = [
         "1. Load Data",
+        "1.5 Handle Missing Values",
         "2. Data Overview", 
         "3. Privacy Analysis",
         "4. Bias Analysis",
@@ -1199,7 +1539,25 @@ def main():
     if hasattr(st.session_state, 'data_loaded') and st.session_state.data_loaded:
         analyzer = st.session_state.analyzer
         
-        if "2. Data Overview" in selected_step:
+        if "1.5 Handle Missing Values" in selected_step:
+            # Check if data has missing values
+            missing_count = analyzer.data.isnull().sum().sum()
+            if missing_count == 0:
+                st.success("✅ No missing values found in your dataset!")
+                st.info("You can skip this step and proceed to the next analysis.")
+            else:
+                st.info(f"Found {missing_count} missing values in the dataset. Let's handle them!")
+                
+                # Handle missing values
+                if analyzer.handle_missing_values():
+                    st.session_state.data_cleaned = True
+                    st.session_state.analyzer = analyzer
+                    
+                    # Show guidance for next steps
+                    st.success("🎉 Missing values handled successfully!")
+                    st.info("👆 You can now proceed to **Step 2: Data Overview** or any other analysis step.")
+        
+        elif "2. Data Overview" in selected_step:
             info_df = analyzer.data_overview()
         
         elif "3. Privacy Analysis" in selected_step:
