@@ -56,6 +56,17 @@ except ImportError:
     CUSTOM_MODULES_AVAILABLE = False
     st.info("Custom modules not found. Using basic analysis only.")
 
+# Azure Integration
+try:
+    from azure_config import azure_config
+    from azure_storage_helper import azure_storage
+    from azure_ml_helper import azure_ml
+    AZURE_AVAILABLE = True
+    st.sidebar.success("☁️ Azure services connected")
+except ImportError:
+    AZURE_AVAILABLE = False
+    st.sidebar.warning("⚠️ Azure services not available")
+
 class ModelGovernanceAnalyzer:
     def __init__(self):
         self.data = None
@@ -687,7 +698,7 @@ class ModelGovernanceAnalyzer:
             categorical_cols,
             default=st.session_state.selected_sensitive,
             key="bias_sensitive_multiselect",
-            help="Choose demographic or sensitive attributes that could lead to unfair treatment (e.g., Gender, Age groups, etc.)"
+            help="Choose demographic or sensitive attributes that could lead to unfair treatment (e.g., Gender, Age groups, etc.). Your selections will be remembered as you navigate between pages."
         )
         
         # Update session state when selection changes
@@ -696,7 +707,7 @@ class ModelGovernanceAnalyzer:
         
         # Show current selections for user feedback
         if selected_sensitive:
-            st.success(f"📊 **Selected sensitive features**: {', '.join(selected_sensitive)}")
+            st.success(f"📊 **Selected sensitive features**: {', '.join(selected_sensitive)} (persisted across pages)")
         
         if not selected_sensitive:
             st.warning("Please select at least one sensitive feature for bias analysis.")
@@ -744,6 +755,7 @@ class ModelGovernanceAnalyzer:
         
         # Use session state to remember target variable selection
         if 'target_col' not in st.session_state:
+            # Default to first column if no previous selection
             st.session_state.target_col = self.data.columns[0]  # Default to first column
         
         # Find the index of the previously selected target variable
@@ -756,7 +768,8 @@ class ModelGovernanceAnalyzer:
             "Select target variable:", 
             self.data.columns.tolist(),
             index=current_index,
-            key="bias_target_selectbox"
+            key="bias_target_selectbox",
+            help="This selection will be remembered as you navigate between pages"
         )
         
         # Update session state when target variable changes
@@ -765,7 +778,7 @@ class ModelGovernanceAnalyzer:
         
         # Show current target selection for user feedback
         if target_col:
-            st.success(f"🎯 **Selected target variable**: {target_col}")
+            st.success(f"🎯 **Selected target variable**: {target_col} (persisted across pages)")
         
         if target_col:
             # Analyze target variable
@@ -1979,6 +1992,12 @@ def main():
     st.title("⚖️ AI Model Governance & Fairness Analyzer")
     st.markdown("Comprehensive analysis for bias, privacy, and governance compliance")
     
+    # Show session persistence info
+    if 'session_datasets' in st.session_state and st.session_state.session_datasets:
+        st.info(f"✅ **Session Active**: {len(st.session_state.session_datasets)} dataset(s) available. Your data and selections will persist as you navigate between analysis steps.")
+    else:
+        st.warning("⚠️ **New Session**: Upload or select datasets to begin analysis. Note: All datasets and progress will be lost if you reload/refresh the page.")
+    
     # Check for optional dependencies and show installation guide
     if not SHAP_AVAILABLE:
         with st.expander("🔧 Optional Dependencies Setup", expanded=True):
@@ -1999,6 +2018,47 @@ def main():
     
     # Sidebar for navigation
     st.sidebar.title("📋 Analysis Steps")
+    
+    # Azure Status Dashboard
+    if AZURE_AVAILABLE:
+        with st.sidebar.expander("☁️ Azure Services Status", expanded=False):
+            try:
+                # Storage Status
+                storage_connected = azure_storage.blob_service_client is not None
+                if storage_connected:
+                    st.success("✅ Blob Storage Connected")
+                    datasets = azure_storage.list_datasets()
+                    st.write(f"📁 {len(datasets)} datasets available")
+                else:
+                    st.error("❌ Blob Storage Disconnected")
+                
+                # ML Status
+                ml_status = azure_ml.get_azure_ml_status()
+                if ml_status.get('connected', False):
+                    st.success(f"✅ ML Workspace: {ml_status['name']}")
+                    st.write(f"🌍 Region: {ml_status.get('region', 'N/A')}")
+                else:
+                    st.error("❌ ML Workspace Disconnected")
+                    
+                # Show deployment URL
+                st.info("🌐 **Production URL:**")
+                st.code("http://fairlens-app-dion.centralindia.azurecontainer.io:8501")
+                
+            except Exception as e:
+                st.error(f"❌ Azure Status Error: {e}")
+                st.write("Running in local mode due to connection issues")
+    else:
+        with st.sidebar.expander("⚠️ Azure Services", expanded=False):
+            st.warning("Azure services not available")
+            st.write("Running in **Demo Mode**")
+            st.info("💡 All analysis features are fully functional using local processing. Upload your own datasets or use the sample data to get started!")
+            st.write("**Demo Features:**")
+            st.write("✅ Bias Detection & Analysis")
+            st.write("✅ Privacy Risk Assessment") 
+            st.write("✅ Model Training & Explainability")
+            st.write("✅ Governance Reporting")
+            st.write("✅ Sample & Custom Dataset Support")
+    
     steps = [
     "1. Load Data",
     "1.5 Handle Missing Values",
@@ -2017,6 +2077,75 @@ def main():
     if "1. Load Data" in selected_step:
         st.header("📁 Data Loading")
         
+        # Initialize session datasets if not exists
+        if 'session_datasets' not in st.session_state:
+            st.session_state.session_datasets = []
+        
+        # Show reload warning if data is already loaded
+        if hasattr(st.session_state, 'data_loaded') and st.session_state.data_loaded:
+            st.warning("⚠️ **Warning**: Reloading new data will clear all current analysis progress!")
+            if st.button("🔄 Clear Current Data and Start Fresh", type="secondary"):
+                # Clear all session state related to analysis
+                for key in ['data_loaded', 'analyzer', 'session_datasets', 'selected_sensitive', 
+                           'target_col', 'risk_df', 'identified_sensitive', 'model_results', 'data_cleaned']:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                st.rerun()
+            
+            st.info("✅ **Current Data Loaded Successfully** - You can continue with analysis steps, or clear data above to start fresh.")
+            
+            # Show currently active dataset
+            if 'active_dataset' in st.session_state and st.session_state.active_dataset:
+                st.success(f"🎯 **Currently Active**: {st.session_state.active_dataset['name']} | {st.session_state.active_dataset['records']:,} records | {st.session_state.active_dataset['features']} features")
+        
+        # Show current session datasets
+        if st.session_state.session_datasets:
+            st.subheader("📊 Current Session Datasets")
+            st.info(f"**{len(st.session_state.session_datasets)} dataset(s)** loaded in this session:")
+            
+            for i, dataset in enumerate(st.session_state.session_datasets):
+                col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+                with col1:
+                    st.write(f"📄 **{dataset['original_name']}**")
+                with col2:
+                    st.write(f"📏 {dataset['records']:,} records")
+                with col3:
+                    st.write(f"📊 {dataset['features']} features")
+                with col4:
+                    if st.button(f"Load", key=f"session_load_{i}"):
+                        # Load this dataset into analyzer
+                        analyzer.data = dataset['data'].copy()  # Use copy to prevent modification
+                        
+                        # Clear any previous analysis state to ensure fresh start with new data
+                        if hasattr(analyzer, 'target_column'):
+                            analyzer.target_column = None
+                        if hasattr(analyzer, 'sensitive_features'):
+                            analyzer.sensitive_features = []
+                        if hasattr(analyzer, 'categorical_features'):
+                            analyzer.categorical_features = []
+                        if hasattr(analyzer, 'numerical_features'):
+                            analyzer.numerical_features = []
+                            
+                        # Reset session state for fresh analysis with new dataset
+                        for key in ['selected_sensitive', 'target_col', 'model_trained']:
+                            if key in st.session_state:
+                                del st.session_state[key]
+                        
+                        # Store information about the currently active dataset
+                        st.session_state.active_dataset = {
+                            'name': dataset['original_name'],
+                            'records': len(analyzer.data),
+                            'features': len(analyzer.data.columns),
+                            'source': 'session'
+                        }
+                        
+                        st.session_state.data_loaded = True
+                        st.session_state.analyzer = analyzer
+                        st.success(f"✅ Loaded {dataset['original_name']}!")
+                        st.rerun()
+            
+            st.divider()
+        
         st.subheader("Choose Data Source")
         
         # Radio button for data source selection
@@ -2030,14 +2159,25 @@ def main():
             default_path = "Datasets/loan_data.csv"
             st.info("📊 **Sample Loan Data**: Clean, structured dataset with person demographics, loan details, and approval status. Perfect for getting started!")
             
-            # Show dataset preview info
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Records", "45K")
-            with col2:
-                st.metric("Features", "14")
-            with col3:
-                st.metric("Type", "Clean & Simple")
+            # Show dataset preview info (use active dataset if available)
+            if 'active_dataset' in st.session_state and st.session_state.active_dataset:
+                active = st.session_state.active_dataset
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Records", f"{active['records']:,}")
+                with col2:
+                    st.metric("Features", f"{active['features']}")
+                with col3:
+                    dataset_type = "Uploaded" if active['source'] == 'uploaded' else "Sample"
+                    st.metric("Type", dataset_type)
+            else:
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Records", "45K")
+                with col2:
+                    st.metric("Features", "14")
+                with col3:
+                    st.metric("Type", "Clean & Simple")
             
             # Show sample features
             st.write("**Key Features Include:**")
@@ -2050,8 +2190,34 @@ def main():
             for feature in sample_features:
                 st.write(feature)
                 
-            if st.button("Load Sample Loan Data", type="primary"):
+            # Dynamic button text based on active dataset or default
+            if 'active_dataset' in st.session_state and st.session_state.active_dataset:
+                button_text = f"Reload {st.session_state.active_dataset['name']}"
+                button_type = "secondary"
+            else:
+                button_text = "Load Sample Loan Data"
+                button_type = "primary"
+                
+            if st.button(button_text, type=button_type):
                 if analyzer.load_data(default_path):
+                    # Add to session datasets with original name preserved
+                    dataset_info = {
+                        'original_name': 'loan_data.csv',
+                        'data': analyzer.data.copy(),
+                        'records': len(analyzer.data),
+                        'features': len(analyzer.data.columns),
+                        'source': 'sample'
+                    }
+                    st.session_state.session_datasets.append(dataset_info)
+                    
+                    # Set as active dataset
+                    st.session_state.active_dataset = {
+                        'name': 'loan_data.csv',
+                        'records': len(analyzer.data),
+                        'features': len(analyzer.data.columns),
+                        'source': 'sample'
+                    }
+                    
                     st.session_state.data_loaded = True
                     st.session_state.analyzer = analyzer
                     
@@ -2059,14 +2225,25 @@ def main():
             large_path = "Datasets/Loan_Default.csv"
             st.info("📈 **Large Loan Default Data**: Comprehensive dataset with more complex features and larger sample size. Great for advanced analysis!")
             
-            # Show dataset preview info
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Records", "148K")
-            with col2:
-                st.metric("Features", "34")
-            with col3:
-                st.metric("Type", "Complex & Large")
+            # Show dataset preview info (use active dataset if available)
+            if 'active_dataset' in st.session_state and st.session_state.active_dataset:
+                active = st.session_state.active_dataset
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Records", f"{active['records']:,}")
+                with col2:
+                    st.metric("Features", f"{active['features']}")
+                with col3:
+                    dataset_type = "Uploaded" if active['source'] == 'uploaded' else "Sample"
+                    st.metric("Type", dataset_type)
+            else:
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Records", "148K")
+                with col2:
+                    st.metric("Features", "34")
+                with col3:
+                    st.metric("Type", "Complex & Large")
             
             # Show sample features
             st.write("**Key Features Include:**")
@@ -2082,13 +2259,45 @@ def main():
                 
             st.warning("⚠️ **Note**: This dataset is larger and more complex. Processing may take longer but provides richer analysis opportunities.")
                 
-            if st.button("Load Large Loan Default Data", type="primary"):
+            # Dynamic button text based on active dataset or default
+            if 'active_dataset' in st.session_state and st.session_state.active_dataset:
+                button_text = f"Reload {st.session_state.active_dataset['name']}"
+                button_type = "secondary"
+            else:
+                button_text = "Load Large Loan Default Data"
+                button_type = "primary"
+                
+            if st.button(button_text, type=button_type, key="large_loan_btn"):
                 if analyzer.load_data(large_path):
+                    # Add to session datasets with original name preserved
+                    dataset_info = {
+                        'original_name': 'Loan_Default.csv',
+                        'data': analyzer.data.copy(),
+                        'records': len(analyzer.data),
+                        'features': len(analyzer.data.columns),
+                        'source': 'sample'
+                    }
+                    st.session_state.session_datasets.append(dataset_info)
+                    
+                    # Set as active dataset
+                    st.session_state.active_dataset = {
+                        'name': 'Loan_Default.csv',
+                        'records': len(analyzer.data),
+                        'features': len(analyzer.data.columns),
+                        'source': 'sample'
+                    }
+                    
                     st.session_state.data_loaded = True
                     st.session_state.analyzer = analyzer
                     
         else:  # Upload Your Own Dataset
             st.info("📤 **Upload Your Own Data**: Upload a CSV file with your own dataset for custom analysis.")
+            
+            # Azure Storage Integration
+            if AZURE_AVAILABLE:
+                st.info("☁️ **Session Storage**: Uploaded files are stored for this session only. They will be cleared when you reload the page.")
+            else:
+                st.info("📁 **Session Storage**: Files are stored in memory for this session only (Azure services not available).")
             
             st.write("**Requirements for your dataset:**")
             st.write("✅ CSV format with headers")
@@ -2099,13 +2308,51 @@ def main():
             uploaded_file = st.file_uploader(
                 "Choose a CSV file", 
                 type="csv",
-                help="Upload your CSV file. Make sure it has headers and includes both demographic features and a target variable."
+                help="Upload your CSV file. File names will be preserved exactly as uploaded. Data will be stored for this session only."
             )
             
             if uploaded_file is not None:
+                # Get original filename
+                original_filename = uploaded_file.name
+                
+                # Load data locally first
                 if analyzer.load_data(uploaded_file):
+                    # Add to session datasets with original name preserved
+                    dataset_info = {
+                        'original_name': original_filename,  # Keep original name exactly
+                        'data': analyzer.data.copy(),
+                        'records': len(analyzer.data),
+                        'features': len(analyzer.data.columns),
+                        'source': 'uploaded'
+                    }
+                    st.session_state.session_datasets.append(dataset_info)
+                    
+                    # Set as active dataset
+                    st.session_state.active_dataset = {
+                        'name': original_filename,
+                        'records': len(analyzer.data),
+                        'features': len(analyzer.data.columns),
+                        'source': 'uploaded'
+                    }
+                    
                     st.session_state.data_loaded = True
                     st.session_state.analyzer = analyzer
+                    st.success(f"✅ Successfully loaded **{original_filename}** ({len(analyzer.data):,} records, {len(analyzer.data.columns)} features)")
+                    
+                    # Upload to Azure Storage if available (but don't change the workflow)
+                    if AZURE_AVAILABLE:
+                        with st.spinner("Storing in Azure for session backup..."):
+                            try:
+                                # Reset file pointer for Azure upload
+                                uploaded_file.seek(0)
+                                success, message = azure_storage.upload_file_to_blob(uploaded_file, preserve_name=False)
+                                if success:
+                                    st.info(f"☁️ {message}")
+                                else:
+                                    st.warning(f"⚠️ Azure backup failed: {message}")
+                            except Exception as e:
+                                st.warning(f"⚠️ Azure backup error: {e}")
+                                st.info("Don't worry - your data is loaded and ready for analysis!")
     
     # Check if data is loaded
     if hasattr(st.session_state, 'data_loaded') and st.session_state.data_loaded:
