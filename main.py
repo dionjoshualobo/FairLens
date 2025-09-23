@@ -1105,17 +1105,91 @@ def main():
     if "1. Load Data" in selected_step:
         st.header("📁 Data Loading")
         
-        # Default to loan_data.csv
-        default_path = "Datasets/loan_data.csv"
+        st.subheader("Choose Data Source")
         
-        use_default = st.checkbox("Use default loan_data.csv", value=True)
+        # Radio button for data source selection
+        data_source = st.radio(
+            "Select your data source:",
+            ["Use Sample Loan Data (45K records)", "Use Large Loan Default Data (148K records)", "Upload Your Own Dataset"],
+            help="Choose from sample datasets or upload your own CSV file"
+        )
         
-        if use_default:
-            if analyzer.load_data(default_path):
-                st.session_state.data_loaded = True
-                st.session_state.analyzer = analyzer
-        else:
-            uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+        if data_source == "Use Sample Loan Data (45K records)":
+            default_path = "Datasets/loan_data.csv"
+            st.info("📊 **Sample Loan Data**: Clean, structured dataset with person demographics, loan details, and approval status. Perfect for getting started!")
+            
+            # Show dataset preview info
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Records", "45K")
+            with col2:
+                st.metric("Features", "14")
+            with col3:
+                st.metric("Type", "Clean & Simple")
+            
+            # Show sample features
+            st.write("**Key Features Include:**")
+            sample_features = [
+                "👤 **Demographics**: person_age, person_gender, person_education",
+                "💰 **Financial**: person_income, credit_score, loan_amnt", 
+                "🎯 **Target**: loan_status (0=Denied, 1=Approved)",
+                "🏠 **Other**: person_home_ownership, loan_intent, loan_int_rate"
+            ]
+            for feature in sample_features:
+                st.write(feature)
+                
+            if st.button("Load Sample Loan Data", type="primary"):
+                if analyzer.load_data(default_path):
+                    st.session_state.data_loaded = True
+                    st.session_state.analyzer = analyzer
+                    
+        elif data_source == "Use Large Loan Default Data (148K records)":
+            large_path = "Datasets/Loan_Default.csv"
+            st.info("📈 **Large Loan Default Data**: Comprehensive dataset with more complex features and larger sample size. Great for advanced analysis!")
+            
+            # Show dataset preview info
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Records", "148K")
+            with col2:
+                st.metric("Features", "34")
+            with col3:
+                st.metric("Type", "Complex & Large")
+            
+            # Show sample features
+            st.write("**Key Features Include:**")
+            complex_features = [
+                "👤 **Demographics**: Gender, age, Region",
+                "💰 **Financial**: income, Credit_Score, loan_amount, rate_of_interest",
+                "🎯 **Target**: Status (0=Default, 1=No Default)", 
+                "🏠 **Property**: property_value, construction_type, occupancy_type",
+                "📊 **Advanced**: LTV, dtir1, Interest_rate_spread, total_units"
+            ]
+            for feature in complex_features:
+                st.write(feature)
+                
+            st.warning("⚠️ **Note**: This dataset is larger and more complex. Processing may take longer but provides richer analysis opportunities.")
+                
+            if st.button("Load Large Loan Default Data", type="primary"):
+                if analyzer.load_data(large_path):
+                    st.session_state.data_loaded = True
+                    st.session_state.analyzer = analyzer
+                    
+        else:  # Upload Your Own Dataset
+            st.info("📤 **Upload Your Own Data**: Upload a CSV file with your own dataset for custom analysis.")
+            
+            st.write("**Requirements for your dataset:**")
+            st.write("✅ CSV format with headers")
+            st.write("✅ At least 100 rows recommended")
+            st.write("✅ Include categorical target variable (for bias analysis)")
+            st.write("✅ Include demographic features (for fairness analysis)")
+            
+            uploaded_file = st.file_uploader(
+                "Choose a CSV file", 
+                type="csv",
+                help="Upload your CSV file. Make sure it has headers and includes both demographic features and a target variable."
+            )
+            
             if uploaded_file is not None:
                 if analyzer.load_data(uploaded_file):
                     st.session_state.data_loaded = True
