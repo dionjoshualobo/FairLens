@@ -549,6 +549,9 @@ class ModelGovernanceAnalyzer:
         """Comprehensive privacy analysis"""
         st.header("🔒 Privacy Analysis")
         
+        # Page description
+        st.info("📋 **About Privacy Analysis:** This step identifies sensitive data in your dataset that could pose privacy risks or compliance issues. We analyze each feature for personally identifiable information (PII), assess re-identification risks, and provide recommendations for data protection based on privacy regulations like GDPR and CCPA.")
+        
         # Identify sensitive features
         sensitive_patterns = {
             'age': ['age', 'birth', 'dob'],
@@ -640,6 +643,9 @@ class ModelGovernanceAnalyzer:
     def bias_analysis(self):
         """Comprehensive bias detection and analysis"""
         st.header("⚖️ Bias Analysis")
+        
+        # Page description
+        st.info("⚖️ **About Bias Analysis:** This step helps identify potential discrimination in your data by analyzing relationships between sensitive demographic features (like gender, race, age) and outcomes. We examine statistical disparities that could indicate unfair treatment and prepare your data for fairness-aware model training.")
         
         # Identify categorical features that could be sensitive
         categorical_cols = self.data.select_dtypes(include=['object']).columns.tolist()
@@ -781,6 +787,9 @@ class ModelGovernanceAnalyzer:
         """Train multiple models for comparison"""
         st.subheader("🤖 Model Training")
         
+        # Page description
+        st.info("🤖 **About Model Training:** This step trains multiple machine learning models on your data to compare their performance and fairness characteristics. We use Random Forest, Logistic Regression, and Gradient Boosting algorithms, then select the best performer for explainability and fairness analysis.")
+        
         # Check for missing values before training
         missing_values = self.data.isnull().sum().sum()
         if missing_values > 0:
@@ -909,6 +918,28 @@ class ModelGovernanceAnalyzer:
         self.model = model_results[best_model_name]['model']
         
         st.success(f"🏆 Best model: {best_model_name} (Accuracy: {model_results[best_model_name]['accuracy']:.4f})")
+        
+        # Educational section on ML algorithms
+        st.subheader("📚 Understanding Machine Learning Algorithms")
+        
+        with st.expander("🤖 About the Algorithms Used"):
+            st.write("**🌳 Random Forest:**")
+            st.write("• Combines multiple decision trees to make predictions")
+            st.write("• Good balance of accuracy and interpretability")
+            st.write("• Less prone to overfitting than single decision trees")
+            st.write("• Feature importance based on how much each feature improves tree splits")
+            
+            st.write("**📊 Logistic Regression:**")
+            st.write("• Uses statistical relationships to predict probabilities")
+            st.write("• Highly interpretable - coefficients show direct feature impact")
+            st.write("• Works well for binary classification (yes/no, approve/deny)")
+            st.write("• Assumes linear relationship between features and log-odds of outcome")
+            
+            st.write("**🚀 Gradient Boosting:**")
+            st.write("• Builds models sequentially, each correcting previous model's errors")
+            st.write("• Often achieves high accuracy but can be complex to interpret")
+            st.write("• Risk of overfitting if not properly tuned")
+            st.write("• Feature importance based on how often features are used for splitting")
         
         return model_results, label_encoders
     
@@ -1058,9 +1089,33 @@ class ModelGovernanceAnalyzer:
                     
                     continue
     
+        # Educational section on fairness metrics
+        st.subheader("📚 Understanding Fairness Metrics")
+        
+        with st.expander("⚖️ Fairness Metrics Explained"):
+            st.write("**📊 Demographic Parity:**")
+            st.write("• **Acceptable**: Different groups receive positive outcomes at similar rates")
+            st.write("• **Unacceptable**: One group gets approved 80% of time, another only 40%")
+            st.write("• Example: Equal loan approval rates across racial groups")
+            st.write("• May conflict with merit-based decisions if groups have different qualifications")
+            
+            st.write("**⚖️ Equalized Odds:**")
+            st.write("• **Acceptable**: Model has similar accuracy for all groups")
+            st.write("• **Unacceptable**: Model correctly identifies 90% of qualified applicants from one group but only 60% from another")
+            st.write("• Focuses on equal treatment of truly qualified individuals")
+            st.write("• Generally preferred over demographic parity for merit-based decisions")
+            
+            st.write("**🎯 Which Metric to Use:**")
+            st.write("• **Use Demographic Parity** when equal representation is the goal")
+            st.write("• **Use Equalized Odds** when equal treatment based on merit is the goal")
+            st.write("• Consider business context and legal requirements when choosing")
+    
     def explainability_analysis(self):
         """SHAP-based model explainability"""
         st.header("🔍 Model Explainability")
+        
+        # Page description
+        st.info("🔍 **About Explainability Analysis:** This step reveals how your AI model makes decisions by identifying which features are most important for predictions. Understanding model behavior is crucial for trust, regulatory compliance, and detecting potential bias in decision-making patterns.")
         
         if self.model is None:
             st.warning("Please train a model first.")
@@ -1207,6 +1262,66 @@ class ModelGovernanceAnalyzer:
                     }).sort_values('SHAP_Importance', ascending=False)
                     
                     st.subheader("📊 SHAP Feature Importance")
+                    
+                    # Enhanced analysis of feature importance
+                    st.write("**🎯 Key Insights from Feature Importance:**")
+                    
+                    # Top 3 most important features
+                    top_3_features = feature_importance_df.head(3)
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.metric(
+                            label="🥇 Most Important Feature",
+                            value=top_3_features.iloc[0]['Feature'],
+                            delta=f"SHAP: {top_3_features.iloc[0]['SHAP_Importance']:.4f}"
+                        )
+                    
+                    with col2:
+                        st.metric(
+                            label="🥈 Second Most Important",
+                            value=top_3_features.iloc[1]['Feature'],
+                            delta=f"SHAP: {top_3_features.iloc[1]['SHAP_Importance']:.4f}"
+                        )
+                    
+                    with col3:
+                        st.metric(
+                            label="🥉 Third Most Important",
+                            value=top_3_features.iloc[2]['Feature'],
+                            delta=f"SHAP: {top_3_features.iloc[2]['SHAP_Importance']:.4f}"
+                        )
+                    
+                    # Feature importance distribution analysis
+                    total_importance = feature_importance_df['SHAP_Importance'].sum()
+                    top_5_contribution = feature_importance_df.head(5)['SHAP_Importance'].sum() / total_importance * 100
+                    
+                    st.write(f"**📈 Feature Concentration Analysis:**")
+                    st.write(f"• Top 5 features contribute **{top_5_contribution:.1f}%** of total model decisions")
+                    
+                    if top_5_contribution > 80:
+                        st.warning("⚠️ **High Feature Concentration**: Model relies heavily on few features - consider feature engineering or regularization")
+                    elif top_5_contribution < 40:
+                        st.info("📊 **Distributed Importance**: Model uses many features relatively equally - good for robustness")
+                    else:
+                        st.success("✅ **Balanced Feature Usage**: Healthy distribution of feature importance")
+                    
+                    # Bias risk assessment based on feature importance
+                    st.write("**⚖️ Fairness Risk Assessment:**")
+                    sensitive_in_top_10 = []
+                    top_10_features = feature_importance_df.head(10)['Feature'].tolist()
+                    
+                    # Check if sensitive features appear in top important features
+                    for feature in top_10_features:
+                        feature_lower = feature.lower()
+                        if any(sensitive_word in feature_lower for sensitive_word in 
+                               ['gender', 'sex', 'race', 'ethnicity', 'age', 'religion', 'marital']):
+                            sensitive_in_top_10.append(feature)
+                    
+                    if sensitive_in_top_10:
+                        st.error(f"🚨 **Bias Risk Detected**: Sensitive features {sensitive_in_top_10} are highly important for predictions")
+                        st.write("**Recommendation**: Implement fairness constraints or consider feature removal/transformation")
+                    else:
+                        st.success("✅ **Low Bias Risk**: No obviously sensitive features in top 10 most important")
                     
                     # Plot top features
                     top_features = feature_importance_df.head(10)
@@ -1373,10 +1488,54 @@ class ModelGovernanceAnalyzer:
             st.error("❌ Unable to generate feature importance analysis. Please check your model and data.")
         else:
             st.success("✅ Model explainability analysis completed!")
+        
+        # Educational section on key concepts
+        st.subheader("📚 Understanding Key Concepts")
+        
+        # Create expandable sections for each concept
+        with st.expander("🤖 Machine Learning Algorithms Explained"):
+            st.write("**🌳 Random Forest:**")
+            st.write("• Combines multiple decision trees to make predictions")
+            st.write("• Good balance of accuracy and interpretability")
+            st.write("• Less prone to overfitting than single decision trees")
+            st.write("• Feature importance based on how much each feature improves tree splits")
+            
+            st.write("**📊 Logistic Regression:**")
+            st.write("• Uses statistical relationships to predict probabilities")
+            st.write("• Highly interpretable - coefficients show direct feature impact")
+            st.write("• Works well for binary classification (yes/no, approve/deny)")
+            st.write("• Assumes linear relationship between features and log-odds of outcome")
+            
+            st.write("**🚀 Gradient Boosting:**")
+            st.write("• Builds models sequentially, each correcting previous model's errors")
+            st.write("• Often achieves high accuracy but can be complex to interpret")
+            st.write("• Risk of overfitting if not properly tuned")
+            st.write("• Feature importance based on how often features are used for splitting")
+        
+        with st.expander("⚖️ Fairness Metrics Explained"):
+            st.write("**📊 Demographic Parity:**")
+            st.write("• **Acceptable**: Different groups receive positive outcomes at similar rates")
+            st.write("• **Unacceptable**: One group gets approved 80% of time, another only 40%")
+            st.write("• Example: Equal loan approval rates across racial groups")
+            st.write("• May conflict with merit-based decisions if groups have different qualifications")
+            
+            st.write("**⚖️ Equalized Odds:**")
+            st.write("• **Acceptable**: Model has similar accuracy for all groups")
+            st.write("• **Unacceptable**: Model correctly identifies 90% of qualified applicants from one group but only 60% from another")
+            st.write("• Focuses on equal treatment of truly qualified individuals")
+            st.write("• Generally preferred over demographic parity for merit-based decisions")
+            
+            st.write("**🎯 Which Metric to Use:**")
+            st.write("• **Use Demographic Parity** when equal representation is the goal")
+            st.write("• **Use Equalized Odds** when equal treatment based on merit is the goal")
+            st.write("• Consider business context and legal requirements when choosing")
     
     def generate_governance_report(self, risk_df, sensitive_features, identified_sensitive):
         """Generate comprehensive governance report"""
         st.header("📋 Governance Report")
+        
+        # Page description
+        st.info("📋 **About Governance Report:** This comprehensive report summarizes all findings from privacy, bias, and explainability analyses. It provides executive-level insights, actionable recommendations, and regulatory compliance guidance to help you deploy AI responsibly and meet industry standards.")
         
         report_data = {
             'report_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
