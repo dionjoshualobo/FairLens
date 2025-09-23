@@ -10,7 +10,7 @@
 
 ### Azure Infrastructure
 - **Container Registry**: fairlensregistry.azurecr.io ✅
-- **Container Instance**: fairlens-app (v1.7-dataset-indicator) ✅
+- **Container Instance**: fairlens-app (v1.8-dynamic-buttons) ✅
 - **Blob Storage**: fairlensmlwork3450594214 with 'datasets' container ✅
 - **ML Workspace**: fairlens-ml-workspace ✅
 - **Resource Group**: fairlens-rg ✅
@@ -39,12 +39,12 @@
 ## 🔧 Technical Configuration
 
 ### Container Specifications
-- **Image**: fairlensregistry.azurecr.io/fairlens:v1.7-dataset-indicator
+- **Image**: fairlensregistry.azurecr.io/fairlens:v1.8-dynamic-buttons
 - **OS Type**: Linux
 - **CPU**: 1 core
 - **Memory**: 2 GB
 - **Port**: 8501
-- **IP Address**: 20.219.200.111
+- **IP Address**: 20.244.57.252
 
 ### Environment Variables (Secure)
 ```
@@ -78,6 +78,7 @@ AZURE_TENANT_ID=8b4ec0c7-9e79-4e6b-9f9d-f57ad49dcfef
 9. **Reload Protection**: Warning users before data loss on page refresh
 10. **Active Dataset Indicator**: Clear display of which dataset is currently being used
 11. **Dynamic Dataset Info**: Real-time display of records, features, and dataset type
+12. **Smart Button Labels**: Button text changes to show current dataset being reloaded
 
 ---
 
