@@ -1609,153 +1609,128 @@ class ModelGovernanceAnalyzer:
     def generate_governance_report(self, risk_df, sensitive_features, identified_sensitive):
         """Generate comprehensive governance report"""
         st.header("📋 Governance Report")
-        
-        # Page description
-        st.info("📋 **About Governance Report:** This comprehensive report summarizes all findings from privacy, bias, and explainability analyses. It provides executive-level insights, actionable recommendations, and regulatory compliance guidance to help you deploy AI responsibly and meet industry standards.")
-        
-        report_data = {
-            'report_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'dataset_info': {
-                'total_records': len(self.data),
-                'total_features': len(self.data.columns),
-                'missing_values': self.data.isnull().sum().sum()
-            },
-            'privacy_assessment': {
-                'high_risk_features': risk_df[risk_df['Privacy Risk'] >= 3]['Feature'].tolist(),
-                'identified_sensitive_categories': list(identified_sensitive.keys())
-            },
-            'bias_assessment': {
-                'analyzed_sensitive_features': sensitive_features,
-                'recommendations': []
-            }
-        }
-        
-        # Display summary
+        st.markdown(
+            "This comprehensive report summarizes findings from privacy, bias, and explainability analyses. "
+            "It provides executive-level insights, recommendations, and compliance guidance."
+        )
+        st.markdown("---")
+
+        # Executive Summary
         st.subheader("Executive Summary")
-        
         col1, col2 = st.columns(2)
-        
         with col1:
-            st.write("**🔍 High-Risk Features Analysis**")
-            
-            # Show actionable privacy risks
+            st.markdown("**🔍 High-Risk Features Analysis**")
             high_risk_features = risk_df[risk_df['Privacy Risk'] >= 3]
             critical_risk_features = risk_df[risk_df['Privacy Risk'] >= 4]
-            
             if len(critical_risk_features) > 0:
-                st.error(f"🚨 **{len(critical_risk_features)} CRITICAL risk features** need immediate attention")
-                
-                # Explain what makes features critical
-                with st.expander("❓ Why are these features Critical Risk?", expanded=True):
-                    st.warning("**Critical Risk Features** are identified because they:")
-                    st.write("🔍 **High Uniqueness**: >90% unique values (likely personal identifiers)")
-                    st.write("🏷️ **Sensitive Patterns**: Names contain 'id', 'ssn', 'email', 'phone', 'passport'")
-                    st.write("🌍 **Location Data**: Addresses, coordinates, postal codes")
-                    st.write("💳 **Financial IDs**: Account numbers, credit card info")
-                    st.write("⚠️ **Re-identification Risk**: Could identify individuals when combined")
-                
-                st.write("**🚨 Critical Risk Features Found:**")
+                # Build a string listing the critical features and their risk levels
+                feature_list = ", ".join([
+                    f"{row['Feature']} (Risk Level: {row['Risk Level']})"
+                    for _, row in critical_risk_features.head(3).iterrows()
+                ])
+                st.error(f"🚨 {len(critical_risk_features)} CRITICAL risk feature{'s' if len(critical_risk_features) > 1 else ''} need immediate attention: {feature_list}")
+                with st.expander("Why are these features Critical Risk?", expanded=False):
+                    st.markdown("""
+                    - **High Uniqueness**: >90% unique values (likely personal identifiers)
+                    - **Sensitive Patterns**: Names contain 'id', 'ssn', 'email', 'phone', 'passport'
+                    - **Location Data**: Addresses, coordinates, postal codes
+                    - **Financial IDs**: Account numbers, credit card info
+                    - **Re-identification Risk**: Could identify individuals when combined
+                    """)
+                st.markdown("**Critical Risk Features Found:**")
                 for _, row in critical_risk_features.head(3).iterrows():
-                    st.write(f"• **{row['Feature']}** (Risk Level: {row['Risk Level']})")
+                    st.markdown(f"- **{row['Feature']}** (Risk Level: {row['Risk Level']})")
             elif len(high_risk_features) > 0:
-                st.warning(f"⚠️ **{len(high_risk_features)} high-risk features** need review")
+                st.warning(f"⚠️ {len(high_risk_features)} high-risk features need review")
                 for _, row in high_risk_features.head(3).iterrows():
-                    st.write(f"• **{row['Feature']}** (Risk Level: {row['Risk Level']})")
+                    st.markdown(f"- **{row['Feature']}** (Risk Level: {row['Risk Level']})")
             else:
-                st.success("✅ **No critical privacy risks** detected in current features")
-                
-            # Show dataset-specific insights
+                st.success("✅ No critical privacy risks detected in current features")
             total_features = len(risk_df)
             low_risk_count = len(risk_df[risk_df['Privacy Risk'] <= 2])
-            st.info(f"📊 **Privacy Summary**: {low_risk_count}/{total_features} features are low-risk")
-        
+            st.info(f"Privacy Summary: {low_risk_count}/{total_features} features are low-risk")
         with col2:
-            st.write("**🎯 Domain-Specific Insights**")
-            
-            # Show domain-specific analysis
+            st.markdown("**🎯 Domain-Specific Insights**")
             column_names = [col.lower() for col in self.data.columns]
             domain_insights = []
-            
             if any('loan' in col or 'credit' in col for col in column_names):
-                domain_insights.append("🏦 **Financial Services** data detected")
-                domain_insights.append("→ FCRA compliance required")
-                
+                domain_insights.append("🏦 Financial Services data detected\n→ FCRA compliance required")
             if any('person' in col or 'gender' in col for col in column_names):
-                domain_insights.append("👤 **Personal Demographics** present")
-                domain_insights.append("→ EEOC bias monitoring needed")
-                
+                domain_insights.append("👤 Personal Demographics present\n→ EEOC bias monitoring needed")
             if any('income' in col or 'salary' in col for col in column_names):
-                domain_insights.append("💰 **Financial Information** identified")
-                domain_insights.append("→ Consider differential privacy")
-                
+                domain_insights.append("💰 Financial Information identified\n→ Consider differential privacy")
             if any('age' in col for col in column_names):
-                domain_insights.append("📅 **Age Information** found")
-                domain_insights.append("→ ADEA compliance monitoring")
-            
+                domain_insights.append("📅 Age Information found\n→ ADEA compliance monitoring")
             if domain_insights:
                 for insight in domain_insights:
-                    st.write(insight)
+                    st.markdown(insight)
             else:
-                st.write("📋 **General dataset** - no specific domain patterns detected")
-                
-            # Dataset size context
+                st.markdown("General dataset - no specific domain patterns detected")
             total_records = len(self.data)
             if total_records < 1000:
-                st.write(f"⚠️ **Small dataset** ({total_records:,} records)")
-                st.write("→ Limited statistical power for bias detection")
+                st.info(f"Small dataset ({total_records:,} records)\n→ Limited statistical power for bias detection")
             elif total_records > 100000:
-                st.write(f"📈 **Large dataset** ({total_records:,} records)")  
-                st.write("→ Consider sampling for efficient analysis")
-        
-        # Show actionable privacy risk visualization
-        st.subheader("📊 Privacy Risk Analysis")
-        
-        # Create a more useful visualization
+                st.info(f"Large dataset ({total_records:,} records)\n→ Consider sampling for efficient analysis")
+        st.markdown("---")
+
+        # Privacy Risk Analysis
+        st.subheader("Privacy Risk Analysis")
         high_risk_features = risk_df[risk_df['Privacy Risk'] >= 2].sort_values('Privacy Risk', ascending=True)
-        
         if len(high_risk_features) > 0:
-            # Bar chart showing specific risky features
-            fig = px.bar(
-                high_risk_features.tail(10),  # Show top 10 risky features
-                x='Privacy Risk', 
-                y='Feature',
-                color='Risk Level',
-                orientation='h',
-                title="🔍 Features Requiring Privacy Attention",
-                color_discrete_map={
-                    'Critical': '#ff4444',
-                    'Very High': '#ff8800', 
-                    'High': '#ffaa00',
-                    'Medium': '#ffdd00',
-                    'Low': '#88dd00',
-                    'Very Low': '#44dd44'
-                }
-            )
-            fig.update_layout(height=400, yaxis={'categoryorder': 'total ascending'})
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Summary table of risky features
-            st.write("**🎯 Priority Features for Review:**")
-            priority_features = high_risk_features[['Feature', 'Risk Level', 'Privacy Risk']].tail(5)
-            st.dataframe(priority_features, use_container_width=True)
+            with st.expander("Show Top Risky Features", expanded=True):
+                fig = px.bar(
+                    high_risk_features.tail(10),
+                    x='Privacy Risk',
+                    y='Feature',
+                    color='Risk Level',
+                    orientation='h',
+                    title="Features Requiring Privacy Attention",
+                    color_discrete_map={
+                        'Critical': '#ff4444',
+                        'Very High': '#ff8800',
+                        'High': '#ffaa00',
+                        'Medium': '#ffdd00',
+                        'Low': '#88dd00',
+                        'Very Low': '#44dd44'
+                    }
+                )
+                fig.update_layout(height=400, yaxis={'categoryorder': 'total ascending'})
+                st.plotly_chart(fig, use_container_width=True)
+            with st.expander("Priority Features for Review", expanded=False):
+                priority_features = high_risk_features[['Feature', 'Risk Level', 'Privacy Risk']].tail(5)
+                st.dataframe(priority_features, use_container_width=True)
         else:
-            st.success("✅ **Excellent Privacy Profile** - No features require special attention")
+            st.success("✅ Excellent Privacy Profile - No features require special attention")
             st.info("All features have low privacy risk scores")
-        
-        # Generate specialized recommendations based on actual analysis
-        recommendations = self._generate_specialized_recommendations(
-            risk_df, sensitive_features, identified_sensitive, report_data
-        )
-        
+        st.markdown("---")
+
         # Recommendations
-        st.subheader("🎯 Data-Specific Key Recommendations")
-        
-        for i, rec in enumerate(recommendations, 1):
-            st.write(f"{i}. {rec}")
-        
+        recommendations = self._generate_specialized_recommendations(
+            risk_df, sensitive_features, identified_sensitive, {
+                'report_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'dataset_info': {
+                    'total_records': len(self.data),
+                    'total_features': len(self.data.columns),
+                    'missing_values': self.data.isnull().sum().sum()
+                },
+                'privacy_assessment': {
+                    'high_risk_features': risk_df[risk_df['Privacy Risk'] >= 3]['Feature'].tolist(),
+                    'identified_sensitive_categories': list(identified_sensitive.keys())
+                },
+                'bias_assessment': {
+                    'analyzed_sensitive_features': sensitive_features,
+                    'recommendations': []
+                }
+            }
+        )
+        st.subheader("Data-Specific Key Recommendations")
+        with st.expander("Show Recommendations", expanded=False):
+            for i, rec in enumerate(recommendations, 1):
+                st.markdown(f"{i}. {rec}")
+        st.markdown("---")
+
         # Export functionality
-        st.subheader("📤 Export Report")
-        
+        st.subheader("Export Report")
         if st.button("Generate Detailed Report"):
             # Get bias metrics if available
             bias_metrics_text = ""
@@ -2025,14 +2000,15 @@ def main():
     # Sidebar for navigation
     st.sidebar.title("📋 Analysis Steps")
     steps = [
-        "1. Load Data",
-        "1.5 Handle Missing Values",
-        "2. Data Overview", 
-        "3. Privacy Analysis",
-        "4. Bias Analysis",
-        "5. Model Training",
-        "6. Explainability",
-        "7. Governance Report"
+    "1. Load Data",
+    "1.5 Handle Missing Values",
+    "2. Data Overview", 
+    "3. Privacy Analysis",
+    "4. Bias Analysis",
+    "5. Model Training",
+    "6. Explainability",
+    "7. Governance Report",
+    "8. Overview Report (For Everyone)"
     ]
     
     selected_step = st.sidebar.radio("Select Analysis Step:", steps)
@@ -2230,6 +2206,48 @@ def main():
                 )
             else:
                 st.warning("Please complete previous analysis steps first.")
+
+        elif "8. Overview Report (For Everyone)" in selected_step:
+            if hasattr(st.session_state, 'risk_df'):
+                st.header("📝 Overview Report (For Everyone)")
+                st.markdown(
+                    "This section gives a simple summary of your data and its risks, using plain language and easy-to-understand visuals. No technical terms!"
+                )
+                # Simple summary of critical features
+                risk_df = st.session_state.risk_df
+                critical_risk_features = risk_df[risk_df['Privacy Risk'] >= 4]
+                high_risk_features = risk_df[(risk_df['Privacy Risk'] == 3)]
+                if len(critical_risk_features) > 0:
+                    feature_names = ', '.join([str(row['Feature']) for _, row in critical_risk_features.head(3).iterrows()])
+                    st.error(f"Some information in your data (like {feature_names}) is very private and could identify someone. Please be careful with this data.")
+                else:
+                    st.success("Your data does not have any information that could easily identify someone.")
+                # Simple privacy risk bar chart
+                st.subheader("Privacy Risk in Your Data")
+                simple_risk = risk_df[['Feature', 'Privacy Risk']].copy()
+                simple_risk = simple_risk.sort_values('Privacy Risk', ascending=False).head(5)
+                st.bar_chart(simple_risk.set_index('Feature'))
+                # Simple count of safe vs risky features
+                safe_count = (risk_df['Privacy Risk'] <= 2).sum()
+                risky_count = (risk_df['Privacy Risk'] > 2).sum()
+                st.info(f"Out of all the things in your data, {safe_count} are safe and {risky_count} need some care.")
+                # Data-specific recommendations
+                st.subheader("What Should You Do?")
+                recs = []
+                if len(critical_risk_features) > 0:
+                    recs.append(f"Remove or anonymize the following very private information: {', '.join([str(row['Feature']) for _, row in critical_risk_features.iterrows()])}.")
+                if len(high_risk_features) > 0:
+                    recs.append(f"Review and protect these sensitive features: {', '.join([str(row['Feature']) for _, row in high_risk_features.iterrows()])}.")
+                if risky_count == 0:
+                    recs.append("Your data is generally safe. Just keep it secure and private.")
+                if safe_count > risky_count and risky_count > 0:
+                    recs.append("Most of your data is safe, but pay attention to the risky features above.")
+                if not recs:
+                    recs.append("No special action needed. Keep your data safe and secure.")
+                for rec in recs:
+                    st.markdown(f"- {rec}")
+            else:
+                st.info("Please complete privacy analysis first.")
     
     else:
         st.info("👆 Please load your data first using the sidebar.")
