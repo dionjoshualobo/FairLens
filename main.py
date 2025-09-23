@@ -1148,31 +1148,43 @@ def main():
         
         elif "5. Model Training" in selected_step:
             if hasattr(st.session_state, 'selected_sensitive') and hasattr(st.session_state, 'target_col'):
-                try:
-                    model_results, label_encoders = analyzer.train_models(
-                        st.session_state.target_col, 
-                        st.session_state.selected_sensitive
-                    )
-                    
-                    if model_results is not None and label_encoders is not None:
-                        st.session_state.model_results = model_results
-                        st.session_state.label_encoders = label_encoders
-                        
-                        # Calculate fairness metrics
-                        if FAIRLEARN_AVAILABLE:
-                            analyzer.fairness_metrics(
-                                st.session_state.selected_sensitive,
-                                model_results,
-                                label_encoders
-                            )
+                # Check if model is already trained for the current target and sensitive features
+                cache_key = f"{st.session_state.target_col}_{str(st.session_state.selected_sensitive)}"
+                if (
+                    hasattr(st.session_state, 'model_results') and 
+                    hasattr(st.session_state, 'label_encoders') and 
+                    hasattr(st.session_state, 'model_cache_key') and 
+                    st.session_state.model_cache_key == cache_key
+                ):
+                    st.info("Model already trained for current selection. Skipping retraining.")
+                    model_results = st.session_state.model_results
+                    label_encoders = st.session_state.label_encoders
+                else:
+                    try:
+                        model_results, label_encoders = analyzer.train_models(
+                            st.session_state.target_col, 
+                            st.session_state.selected_sensitive
+                        )
+                        if model_results is not None and label_encoders is not None:
+                            st.session_state.model_results = model_results
+                            st.session_state.label_encoders = label_encoders
+                            st.session_state.model_cache_key = cache_key
                         else:
-                            st.warning("⚠️ Fairlearn not available. Install with: pip install fairlearn")
-                    else:
-                        st.error("❌ Model training failed. Please check your data and try again.")
-                        
-                except Exception as e:
-                    st.error(f"❌ Error in model training: {str(e)}")
-                    st.info("Please check your data quality and try again.")
+                            st.error("❌ Model training failed. Please check your data and try again.")
+                            return
+                    except Exception as e:
+                        st.error(f"❌ Error in model training: {str(e)}")
+                        st.info("Please check your data quality and try again.")
+                        return
+                # Calculate fairness metrics
+                if FAIRLEARN_AVAILABLE:
+                    analyzer.fairness_metrics(
+                        st.session_state.selected_sensitive,
+                        model_results,
+                        label_encoders
+                    )
+                else:
+                    st.warning("⚠️ Fairlearn not available. Install with: pip install fairlearn")
             else:
                 st.warning("Please complete bias analysis first.")
         
