@@ -2117,6 +2117,10 @@ def main():
                 st.rerun()
             
             st.info("✅ **Current Data Loaded Successfully** - You can continue with analysis steps, or clear data above to start fresh.")
+            
+            # Show currently active dataset
+            if 'active_dataset' in st.session_state and st.session_state.active_dataset:
+                st.success(f"🎯 **Currently Active**: {st.session_state.active_dataset['name']} | {st.session_state.active_dataset['records']:,} records | {st.session_state.active_dataset['features']} features")
         
         # Show current session datasets
         if st.session_state.session_datasets:
@@ -2135,6 +2139,30 @@ def main():
                     if st.button(f"Load", key=f"session_load_{i}"):
                         # Load this dataset into analyzer
                         analyzer.data = dataset['data'].copy()  # Use copy to prevent modification
+                        
+                        # Clear any previous analysis state to ensure fresh start with new data
+                        if hasattr(analyzer, 'target_column'):
+                            analyzer.target_column = None
+                        if hasattr(analyzer, 'sensitive_features'):
+                            analyzer.sensitive_features = []
+                        if hasattr(analyzer, 'categorical_features'):
+                            analyzer.categorical_features = []
+                        if hasattr(analyzer, 'numerical_features'):
+                            analyzer.numerical_features = []
+                            
+                        # Reset session state for fresh analysis with new dataset
+                        for key in ['selected_sensitive', 'target_col', 'model_trained']:
+                            if key in st.session_state:
+                                del st.session_state[key]
+                        
+                        # Store information about the currently active dataset
+                        st.session_state.active_dataset = {
+                            'name': dataset['original_name'],
+                            'records': len(analyzer.data),
+                            'features': len(analyzer.data.columns),
+                            'source': 'session'
+                        }
+                        
                         st.session_state.data_loaded = True
                         st.session_state.analyzer = analyzer
                         st.success(f"✅ Loaded {dataset['original_name']}!")
@@ -2155,14 +2183,25 @@ def main():
             default_path = "Datasets/loan_data.csv"
             st.info("📊 **Sample Loan Data**: Clean, structured dataset with person demographics, loan details, and approval status. Perfect for getting started!")
             
-            # Show dataset preview info
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Records", "45K")
-            with col2:
-                st.metric("Features", "14")
-            with col3:
-                st.metric("Type", "Clean & Simple")
+            # Show dataset preview info (use active dataset if available)
+            if 'active_dataset' in st.session_state and st.session_state.active_dataset:
+                active = st.session_state.active_dataset
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Records", f"{active['records']:,}")
+                with col2:
+                    st.metric("Features", f"{active['features']}")
+                with col3:
+                    dataset_type = "Uploaded" if active['source'] == 'uploaded' else "Sample"
+                    st.metric("Type", dataset_type)
+            else:
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Records", "45K")
+                with col2:
+                    st.metric("Features", "14")
+                with col3:
+                    st.metric("Type", "Clean & Simple")
             
             # Show sample features
             st.write("**Key Features Include:**")
@@ -2186,6 +2225,15 @@ def main():
                         'source': 'sample'
                     }
                     st.session_state.session_datasets.append(dataset_info)
+                    
+                    # Set as active dataset
+                    st.session_state.active_dataset = {
+                        'name': 'loan_data.csv',
+                        'records': len(analyzer.data),
+                        'features': len(analyzer.data.columns),
+                        'source': 'sample'
+                    }
+                    
                     st.session_state.data_loaded = True
                     st.session_state.analyzer = analyzer
                     
@@ -2193,14 +2241,25 @@ def main():
             large_path = "Datasets/Loan_Default.csv"
             st.info("📈 **Large Loan Default Data**: Comprehensive dataset with more complex features and larger sample size. Great for advanced analysis!")
             
-            # Show dataset preview info
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Records", "148K")
-            with col2:
-                st.metric("Features", "34")
-            with col3:
-                st.metric("Type", "Complex & Large")
+            # Show dataset preview info (use active dataset if available)
+            if 'active_dataset' in st.session_state and st.session_state.active_dataset:
+                active = st.session_state.active_dataset
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Records", f"{active['records']:,}")
+                with col2:
+                    st.metric("Features", f"{active['features']}")
+                with col3:
+                    dataset_type = "Uploaded" if active['source'] == 'uploaded' else "Sample"
+                    st.metric("Type", dataset_type)
+            else:
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Records", "148K")
+                with col2:
+                    st.metric("Features", "34")
+                with col3:
+                    st.metric("Type", "Complex & Large")
             
             # Show sample features
             st.write("**Key Features Include:**")
@@ -2227,6 +2286,15 @@ def main():
                         'source': 'sample'
                     }
                     st.session_state.session_datasets.append(dataset_info)
+                    
+                    # Set as active dataset
+                    st.session_state.active_dataset = {
+                        'name': 'Loan_Default.csv',
+                        'records': len(analyzer.data),
+                        'features': len(analyzer.data.columns),
+                        'source': 'sample'
+                    }
+                    
                     st.session_state.data_loaded = True
                     st.session_state.analyzer = analyzer
                     
@@ -2266,6 +2334,15 @@ def main():
                         'source': 'uploaded'
                     }
                     st.session_state.session_datasets.append(dataset_info)
+                    
+                    # Set as active dataset
+                    st.session_state.active_dataset = {
+                        'name': original_filename,
+                        'records': len(analyzer.data),
+                        'features': len(analyzer.data.columns),
+                        'source': 'uploaded'
+                    }
+                    
                     st.session_state.data_loaded = True
                     st.session_state.analyzer = analyzer
                     st.success(f"✅ Successfully loaded **{original_filename}** ({len(analyzer.data):,} records, {len(analyzer.data.columns)} features)")
