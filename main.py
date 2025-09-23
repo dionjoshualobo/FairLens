@@ -1605,6 +1605,8 @@ Generated on: {report_data['report_date']}
             )
         
         return recommendations
+
+def main():
     st.set_page_config(
         page_title="AI Model Governance & Fairness Analyzer",
         page_icon="⚖️",
