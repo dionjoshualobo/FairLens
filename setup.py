@@ -115,19 +115,6 @@ if __name__ == "__main__":
     
     print("✅ Run script created: run.py")
 
-def setup_directories():
-    """Create necessary directories"""
-    directories = [
-        'reports',
-        'exports',
-        'models',
-        'data_processed'
-    ]
-    
-    for directory in directories:
-        os.makedirs(directory, exist_ok=True)
-        print(f"✅ Created directory: {directory}")
-
 def main():
     """Main setup function"""
     print("🚀 Setting up AI Governance Tool...")
@@ -135,9 +122,6 @@ def main():
     
     # Install packages
     install_packages()
-    
-    print("\n📁 Setting up directories...")
-    setup_directories()
     
     print("\n⚙️ Creating configuration files...")
     create_sample_config()
