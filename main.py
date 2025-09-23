@@ -498,7 +498,7 @@ class ModelGovernanceAnalyzer:
         st.subheader("Data Types and Basic Information")
         info_df = pd.DataFrame({
             'Feature': self.data.columns,
-            'Data Type': self.data.dtypes,
+            'Data Type': [str(dtype) for dtype in self.data.dtypes],  # Convert to string to fix Arrow serialization
             'Non-Null Count': self.data.count(),
             'Null Count': self.data.isnull().sum(),
             'Unique Values': [self.data[col].nunique() for col in self.data.columns]
@@ -1095,14 +1095,29 @@ class ModelGovernanceAnalyzer:
                     y_test_binary = self.y_test
                 
                 # Ensure data is in proper format (convert to numpy arrays)
-                X_train_np = np.array(self.X_train) if hasattr(self.X_train, 'values') else np.array(self.X_train)
-                X_test_np = np.array(self.X_test) if hasattr(self.X_test, 'values') else np.array(self.X_test)
+                # Fix: Properly handle DataFrame to numpy conversion for SHAP
+                if hasattr(self.X_train, 'values'):
+                    X_train_np = self.X_train.values.astype(np.float32)
+                else:
+                    X_train_np = np.array(self.X_train, dtype=np.float32)
+                    
+                if hasattr(self.X_test, 'values'):
+                    X_test_np = self.X_test.values.astype(np.float32)
+                else:
+                    X_test_np = np.array(self.X_test, dtype=np.float32)
+                
+                # Verify shapes and data types
+                st.write(f"**Data for SHAP**: Training shape: {X_train_np.shape}, Test shape: {X_test_np.shape}")
+                st.write(f"**Data types**: Training: {X_train_np.dtype}, Test: {X_test_np.dtype}")
                 
                 # Get feature names before conversion
                 if hasattr(self.X_test, 'columns'):
                     feature_names = self.X_test.columns.tolist()
                 else:
                     feature_names = [f'feature_{i}' for i in range(X_test_np.shape[1])]
+                
+                st.write(f"**Features for SHAP analysis**: {len(feature_names)} features")
+                st.write(f"**Feature names**: {feature_names[:5]}..." if len(feature_names) > 5 else f"**Feature names**: {feature_names}")
                 
                 # Choose appropriate SHAP explainer based on model type
                 if hasattr(self.model, 'estimators_') and 'Forest' in model_name:
