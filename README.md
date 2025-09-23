@@ -42,23 +42,72 @@ This comprehensive tool provides bias detection, privacy analysis, and governanc
 
 ## Installation
 
-### Quick Setup
+### Prerequisites
+- Python 3.8 or higher
+- pip (Python package manager)
 
+### Setup with Virtual Environment (Recommended)
+
+#### For Windows Users:
 1. **Clone or download the project files**
-2. **Run the setup script**:
-   ```bash
-   python setup.py
+2. **Create a virtual environment**:
+   ```cmd
+   python -m venv fairlens-env
    ```
-3. **Start the application**:
+3. **Activate the virtual environment**:
+   ```cmd
+   fairlens-env\Scripts\activate
+   ```
+4. **Install dependencies**:
+   ```cmd
+   pip install -r requirements.txt
+   ```
+5. **Start the application**:
+   ```cmd
+   streamlit run main.py
+   ```
+
+#### For Linux/Mac Users:
+1. **Clone or download the project files**
+2. **Create a virtual environment**:
+   ```bash
+   python -m venv fairlens-env
+   ```
+3. **Activate the virtual environment**:
+   ```bash
+   source fairlens-env/bin/activate
+   ```
+4. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+5. **Start the application**:
    ```bash
    streamlit run main.py
    ```
 
-### Manual Installation
-
+### Deactivating the Virtual Environment
+When you're done working with the project, you can deactivate the virtual environment:
 ```bash
-pip install pandas numpy scikit-learn shap fairlearn matplotlib seaborn plotly streamlit imbalanced-learn lime scipy openpyxl python-dateutil
+deactivate
 ```
+
+### Alternative: Manual Installation (Not Recommended)
+If you prefer not to use a virtual environment (though not recommended):
+```bash
+pip install -r requirements.txt
+```
+
+### Why Use a Virtual Environment?
+- **Isolation**: Prevents conflicts between different project dependencies
+- **Reproducibility**: Ensures consistent package versions across different systems
+- **Clean Environment**: Keeps your system Python installation clean
+- **Easy Management**: Simple to create, delete, and recreate environments
+
+### First-Time Setup Notes
+- The application will automatically detect your data types when you upload a CSV file
+- Sample datasets are provided in the `Datasets/` folder for testing
+- The web interface will be available at `http://localhost:8501` after running the Streamlit command
 
 ## Usage
 
@@ -213,10 +262,22 @@ BIAS_THRESHOLDS = {
 
 ### Common Issues
 
-1. **Import Errors**: Run `python setup.py` to install all dependencies
-2. **Memory Issues**: Reduce sample sizes for SHAP/LIME analysis
-3. **Performance**: Use data sampling for large datasets
-4. **Visualization Issues**: Ensure Plotly is properly installed
+1. **Virtual Environment Issues**:
+   - Make sure you've activated the virtual environment before installing packages or running the app
+   - If packages seem missing, check that you're in the correct environment
+   - To recreate the environment: delete the `fairlens-env` folder and follow setup steps again
+
+2. **Import Errors**: 
+   - Ensure all dependencies are installed: `pip install -r requirements.txt`
+   - Check that you're running Python 3.8 or higher: `python --version`
+
+3. **Memory Issues**: Reduce sample sizes for SHAP/LIME analysis
+
+4. **Performance**: Use data sampling for large datasets
+
+5. **Visualization Issues**: Ensure Plotly is properly installed: `pip install plotly>=5.0.0`
+
+6. **Streamlit Port Issues**: If port 8501 is busy, Streamlit will automatically use the next available port
 
 ### Performance Optimization
 
