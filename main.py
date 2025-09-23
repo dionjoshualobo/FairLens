@@ -978,6 +978,24 @@ class ModelGovernanceAnalyzer:
             st.write("• Risk of overfitting if not properly tuned")
             st.write("• Feature importance based on how often features are used for splitting")
         
+        with st.expander("⚖️ Fairness Metrics Explained"):
+            st.write("**📊 Demographic Parity:**")
+            st.write("• **Acceptable**: Different groups receive positive outcomes at similar rates")
+            st.write("• **Unacceptable**: One group gets approved 80% of time, another only 40%")
+            st.write("• Example: Equal loan approval rates across racial groups")
+            st.write("• May conflict with merit-based decisions if groups have different qualifications")
+            
+            st.write("**⚖️ Equalized Odds:**")
+            st.write("• **Acceptable**: Model has similar accuracy for all groups")
+            st.write("• **Unacceptable**: Model correctly identifies 90% of qualified applicants from one group but only 60% from another")
+            st.write("• Focuses on equal treatment of truly qualified individuals")
+            st.write("• Generally preferred over demographic parity for merit-based decisions")
+            
+            st.write("**🎯 Which Metric to Use:**")
+            st.write("• **Use Demographic Parity** when equal representation is the goal")
+            st.write("• **Use Equalized Odds** when equal treatment based on merit is the goal")
+            st.write("• Consider business context and legal requirements when choosing")
+        
         return model_results, label_encoders
     
     def fairness_metrics(self, sensitive_features, model_results, label_encoders):
@@ -1126,26 +1144,7 @@ class ModelGovernanceAnalyzer:
                     
                     continue
     
-        # Educational section on fairness metrics
-        st.subheader("📚 Understanding Fairness Metrics")
-        
-        with st.expander("⚖️ Fairness Metrics Explained"):
-            st.write("**📊 Demographic Parity:**")
-            st.write("• **Acceptable**: Different groups receive positive outcomes at similar rates")
-            st.write("• **Unacceptable**: One group gets approved 80% of time, another only 40%")
-            st.write("• Example: Equal loan approval rates across racial groups")
-            st.write("• May conflict with merit-based decisions if groups have different qualifications")
-            
-            st.write("**⚖️ Equalized Odds:**")
-            st.write("• **Acceptable**: Model has similar accuracy for all groups")
-            st.write("• **Unacceptable**: Model correctly identifies 90% of qualified applicants from one group but only 60% from another")
-            st.write("• Focuses on equal treatment of truly qualified individuals")
-            st.write("• Generally preferred over demographic parity for merit-based decisions")
-            
-            st.write("**🎯 Which Metric to Use:**")
-            st.write("• **Use Demographic Parity** when equal representation is the goal")
-            st.write("• **Use Equalized Odds** when equal treatment based on merit is the goal")
-            st.write("• Consider business context and legal requirements when choosing")
+
     
     def explainability_analysis(self):
         """SHAP-based model explainability"""
@@ -1525,47 +1524,6 @@ class ModelGovernanceAnalyzer:
             st.error("❌ Unable to generate feature importance analysis. Please check your model and data.")
         else:
             st.success("✅ Model explainability analysis completed!")
-        
-        # Educational section on key concepts
-        st.subheader("📚 Understanding Key Concepts")
-        
-        # Create expandable sections for each concept
-        with st.expander("🤖 Machine Learning Algorithms Explained"):
-            st.write("**🌳 Random Forest:**")
-            st.write("• Combines multiple decision trees to make predictions")
-            st.write("• Good balance of accuracy and interpretability")
-            st.write("• Less prone to overfitting than single decision trees")
-            st.write("• Feature importance based on how much each feature improves tree splits")
-            
-            st.write("**📊 Logistic Regression:**")
-            st.write("• Uses statistical relationships to predict probabilities")
-            st.write("• Highly interpretable - coefficients show direct feature impact")
-            st.write("• Works well for binary classification (yes/no, approve/deny)")
-            st.write("• Assumes linear relationship between features and log-odds of outcome")
-            
-            st.write("**🚀 Gradient Boosting:**")
-            st.write("• Builds models sequentially, each correcting previous model's errors")
-            st.write("• Often achieves high accuracy but can be complex to interpret")
-            st.write("• Risk of overfitting if not properly tuned")
-            st.write("• Feature importance based on how often features are used for splitting")
-        
-        with st.expander("⚖️ Fairness Metrics Explained"):
-            st.write("**📊 Demographic Parity:**")
-            st.write("• **Acceptable**: Different groups receive positive outcomes at similar rates")
-            st.write("• **Unacceptable**: One group gets approved 80% of time, another only 40%")
-            st.write("• Example: Equal loan approval rates across racial groups")
-            st.write("• May conflict with merit-based decisions if groups have different qualifications")
-            
-            st.write("**⚖️ Equalized Odds:**")
-            st.write("• **Acceptable**: Model has similar accuracy for all groups")
-            st.write("• **Unacceptable**: Model correctly identifies 90% of qualified applicants from one group but only 60% from another")
-            st.write("• Focuses on equal treatment of truly qualified individuals")
-            st.write("• Generally preferred over demographic parity for merit-based decisions")
-            
-            st.write("**🎯 Which Metric to Use:**")
-            st.write("• **Use Demographic Parity** when equal representation is the goal")
-            st.write("• **Use Equalized Odds** when equal treatment based on merit is the goal")
-            st.write("• Consider business context and legal requirements when choosing")
     
     def generate_governance_report(self, risk_df, sensitive_features, identified_sensitive):
         """Generate comprehensive governance report"""
