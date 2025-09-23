@@ -2214,7 +2214,15 @@ def main():
             for feature in sample_features:
                 st.write(feature)
                 
-            if st.button("Load Sample Loan Data", type="primary"):
+            # Dynamic button text based on active dataset or default
+            if 'active_dataset' in st.session_state and st.session_state.active_dataset:
+                button_text = f"Reload {st.session_state.active_dataset['name']}"
+                button_type = "secondary"
+            else:
+                button_text = "Load Sample Loan Data"
+                button_type = "primary"
+                
+            if st.button(button_text, type=button_type):
                 if analyzer.load_data(default_path):
                     # Add to session datasets with original name preserved
                     dataset_info = {
@@ -2275,7 +2283,15 @@ def main():
                 
             st.warning("⚠️ **Note**: This dataset is larger and more complex. Processing may take longer but provides richer analysis opportunities.")
                 
-            if st.button("Load Large Loan Default Data", type="primary"):
+            # Dynamic button text based on active dataset or default
+            if 'active_dataset' in st.session_state and st.session_state.active_dataset:
+                button_text = f"Reload {st.session_state.active_dataset['name']}"
+                button_type = "secondary"
+            else:
+                button_text = "Load Large Loan Default Data"
+                button_type = "primary"
+                
+            if st.button(button_text, type=button_type, key="large_loan_btn"):
                 if analyzer.load_data(large_path):
                     # Add to session datasets with original name preserved
                     dataset_info = {
