@@ -34,9 +34,11 @@ except ImportError:
 try:
     import shap
     SHAP_AVAILABLE = True
+    st.sidebar.success("✅ SHAP available for explainability")
 except ImportError:
     SHAP_AVAILABLE = False
-    st.warning("SHAP not installed. Advanced explainability features will be unavailable.")
+    st.sidebar.warning("⚠️ SHAP not installed")
+    st.sidebar.code("pip install shap", language="bash")
 
 # Privacy and Data Analysis
 import re
@@ -1092,43 +1094,74 @@ class ModelGovernanceAnalyzer:
                 else:
                     y_test_binary = self.y_test
                 
+                # Ensure data is in proper format (convert to numpy arrays)
+                X_train_np = np.array(self.X_train) if hasattr(self.X_train, 'values') else np.array(self.X_train)
+                X_test_np = np.array(self.X_test) if hasattr(self.X_test, 'values') else np.array(self.X_test)
+                
+                # Get feature names before conversion
+                if hasattr(self.X_test, 'columns'):
+                    feature_names = self.X_test.columns.tolist()
+                else:
+                    feature_names = [f'feature_{i}' for i in range(X_test_np.shape[1])]
+                
                 # Choose appropriate SHAP explainer based on model type
                 if hasattr(self.model, 'estimators_') and 'Forest' in model_name:
                     # Random Forest
                     st.write("Using TreeExplainer for Random Forest...")
                     explainer = shap.TreeExplainer(self.model)
                     
-                    # Use smaller sample for efficiency and avoid dimension issues
-                    sample_size = min(50, len(self.X_test))
-                    X_sample = self.X_test.iloc[:sample_size] if hasattr(self.X_test, 'iloc') else self.X_test[:sample_size]
+                    # Use smaller sample for efficiency
+                    sample_size = min(30, len(X_test_np))
+                    X_sample = X_test_np[:sample_size]
                     
                     shap_values = explainer.shap_values(X_sample)
                     
                     # Handle multi-output case
                     if isinstance(shap_values, list) and len(shap_values) > 1:
                         shap_values_to_plot = shap_values[1]  # Use positive class
+                        st.info("Using SHAP values for positive class (class 1)")
+                    else:
+                        shap_values_to_plot = shap_values
+                    
+                elif 'Gradient' in model_name:
+                    # Gradient Boosting
+                    st.write("Using TreeExplainer for Gradient Boosting...")
+                    explainer = shap.TreeExplainer(self.model)
+                    
+                    sample_size = min(30, len(X_test_np))
+                    X_sample = X_test_np[:sample_size]
+                    
+                    shap_values = explainer.shap_values(X_sample)
+                    
+                    # For binary classification, GradientBoosting might return single array
+                    if isinstance(shap_values, list) and len(shap_values) > 1:
+                        shap_values_to_plot = shap_values[1]  # Positive class
                         st.info("Using SHAP values for positive class")
                     else:
                         shap_values_to_plot = shap_values
                     
-                elif 'Gradient' in model_name and is_binary:
-                    # Gradient Boosting - only for binary
-                    st.write("Using TreeExplainer for Gradient Boosting...")
-                    explainer = shap.TreeExplainer(self.model)
+                elif 'Logistic' in model_name:
+                    # Logistic Regression
+                    st.write("Using LinearExplainer for Logistic Regression...")
                     
-                    sample_size = min(50, len(self.X_test))
-                    X_sample = self.X_test.iloc[:sample_size] if hasattr(self.X_test, 'iloc') else self.X_test[:sample_size]
+                    sample_size = min(30, len(X_test_np))
+                    X_sample = X_test_np[:sample_size]
+                    X_background = X_train_np[:100]  # Background for linear explainer
                     
+                    explainer = shap.LinearExplainer(self.model, X_background)
                     shap_values = explainer.shap_values(X_sample)
                     shap_values_to_plot = shap_values
                     
-                elif hasattr(self.model, 'predict_proba'):
-                    # Use KernelExplainer for other models
+                else:
+                    # Fallback to KernelExplainer (slower but works for any model)
                     st.write("Using KernelExplainer (this may take a moment)...")
                     
-                    # Ensure we have proper DataFrame/array format
-                    X_background = self.X_train.iloc[:30] if hasattr(self.X_train, 'iloc') else self.X_train[:30]
-                    X_sample = self.X_test.iloc[:30] if hasattr(self.X_test, 'iloc') else self.X_test[:30]
+                    # Use very small samples for KernelExplainer
+                    sample_size = min(20, len(X_test_np))
+                    background_size = min(50, len(X_train_np))
+                    
+                    X_sample = X_test_np[:sample_size]
+                    X_background = X_train_np[:background_size]
                     
                     explainer = shap.KernelExplainer(self.model.predict_proba, X_background)
                     shap_values = explainer.shap_values(X_sample)
@@ -1137,16 +1170,6 @@ class ModelGovernanceAnalyzer:
                         shap_values_to_plot = shap_values[1]  # Positive class
                     else:
                         shap_values_to_plot = shap_values
-                else:
-                    # Linear explainer for linear models
-                    st.write("Using LinearExplainer...")
-                    
-                    X_background = self.X_train.iloc[:50] if hasattr(self.X_train, 'iloc') else self.X_train[:50]
-                    X_sample = self.X_test.iloc[:50] if hasattr(self.X_test, 'iloc') else self.X_test[:50]
-                    
-                    explainer = shap.LinearExplainer(self.model, X_background)
-                    shap_values = explainer.shap_values(X_sample)
-                    shap_values_to_plot = shap_values
                 
                 # Calculate feature importance from SHAP values
                 if shap_values_to_plot is not None:
@@ -1154,13 +1177,8 @@ class ModelGovernanceAnalyzer:
                     if len(shap_values_to_plot.shape) == 1:
                         shap_values_to_plot = shap_values_to_plot.reshape(1, -1)
                     
+                    # Calculate mean absolute SHAP values for feature importance
                     feature_importance_shap = np.abs(shap_values_to_plot).mean(0)
-                    
-                    # Get feature names
-                    if hasattr(self.X_test, 'columns'):
-                        feature_names = self.X_test.columns.tolist()
-                    else:
-                        feature_names = [f'feature_{i}' for i in range(len(feature_importance_shap))]
                     
                     # Ensure lengths match
                     if len(feature_importance_shap) != len(feature_names):
@@ -1184,12 +1202,34 @@ class ModelGovernanceAnalyzer:
                     
                     st.dataframe(feature_importance_df.head(15))
                     
+                    # Add SHAP summary plot if possible
+                    try:
+                        st.subheader("📈 SHAP Summary Plot")
+                        st.write("*Note: This shows how each feature impacts the model's predictions*")
+                        
+                        # Create SHAP summary plot
+                        fig_shap, ax = plt.subplots(figsize=(10, 6))
+                        shap.summary_plot(shap_values_to_plot, X_sample, 
+                                        feature_names=feature_names, 
+                                        plot_type="dot", show=False, ax=ax)
+                        st.pyplot(fig_shap)
+                        plt.close()
+                        
+                    except Exception as plot_error:
+                        st.info(f"Could not generate SHAP summary plot: {str(plot_error)}")
+                    
                     explanation_success = True
                     st.success("✅ SHAP analysis completed successfully!")
                 
             except Exception as e:
-                st.warning(f"SHAP analysis failed: {str(e)}")
+                st.error(f"SHAP analysis failed: {str(e)}")
+                st.info("This could be due to:")
+                st.write("- Complex model architecture")
+                st.write("- Data format incompatibility") 
+                st.write("- Memory limitations with large datasets")
                 st.info("Falling back to alternative explanation methods...")
+        else:
+            st.warning("⚠️ SHAP not installed. Install with: `pip install shap`")
         
         # Fallback to model's built-in feature importance
         if not explanation_success:
@@ -1423,6 +1463,22 @@ def main():
     
     st.title("⚖️ AI Model Governance & Fairness Analyzer")
     st.markdown("Comprehensive analysis for bias, privacy, and governance compliance")
+    
+    # Check for optional dependencies and show installation guide
+    if not SHAP_AVAILABLE:
+        with st.expander("🔧 Optional Dependencies Setup", expanded=True):
+            st.error("**⚠️ SHAP not installed** - Advanced explainability features are unavailable")
+            
+            st.write("**To enable SHAP analysis:**")
+            st.code("pip install shap", language="bash")
+            
+            st.info("**What SHAP provides:**")
+            st.write("✅ Detailed feature importance analysis")
+            st.write("✅ Individual prediction explanations") 
+            st.write("✅ Model behavior visualization")
+            st.write("✅ Trustworthy AI insights")
+            
+            st.warning("**Note**: After installing SHAP, restart your Streamlit application.")
     
     analyzer = ModelGovernanceAnalyzer()
     
