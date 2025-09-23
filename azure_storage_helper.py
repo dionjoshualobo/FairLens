@@ -83,16 +83,20 @@ class AzureStorageHelper:
             st.error(f"Error listing datasets: {str(e)}")
             return []
     
-    def upload_file_to_blob(self, uploaded_file):
+    def upload_file_to_blob(self, uploaded_file, preserve_name=False):
         """Upload Streamlit uploaded file to Azure Blob Storage"""
         try:
             if not self.blob_service_client:
                 return False, "Azure Blob Storage not connected"
             
-            # Create blob name with timestamp to avoid conflicts
-            import datetime
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"uploaded_{timestamp}_{uploaded_file.name}"
+            if preserve_name:
+                # Use original filename (for session-based storage)
+                filename = uploaded_file.name
+            else:
+                # Create blob name with timestamp to avoid conflicts (legacy behavior)
+                import datetime
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"session_{timestamp}_{uploaded_file.name}"
             
             blob_client = self.blob_service_client.get_blob_client(
                 container=self.container_name,
@@ -103,7 +107,7 @@ class AzureStorageHelper:
             uploaded_file.seek(0)  # Reset file pointer
             blob_client.upload_blob(uploaded_file.read(), overwrite=True)
             
-            return True, f"Successfully uploaded {filename} to Azure Storage"
+            return True, f"Successfully stored {uploaded_file.name} (as {filename}) in Azure Storage"
             
         except Exception as e:
             return False, f"Error uploading file: {str(e)}"
