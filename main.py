@@ -1386,23 +1386,100 @@ class ModelGovernanceAnalyzer:
         col1, col2 = st.columns(2)
         
         with col1:
-            st.write("**Privacy Risk Summary**")
-            risk_counts = risk_df['Risk Level'].value_counts()
-            fig = px.pie(values=risk_counts.values, names=risk_counts.index, 
-                        title="Privacy Risk Distribution")
-            st.plotly_chart(fig)
+            st.write("**🔍 High-Risk Features Analysis**")
+            
+            # Show actionable privacy risks
+            high_risk_features = risk_df[risk_df['Privacy Risk'] >= 3]
+            critical_risk_features = risk_df[risk_df['Privacy Risk'] >= 4]
+            
+            if len(critical_risk_features) > 0:
+                st.error(f"🚨 **{len(critical_risk_features)} CRITICAL risk features** need immediate attention")
+                for _, row in critical_risk_features.head(3).iterrows():
+                    st.write(f"• **{row['Feature']}** (Risk Level: {row['Risk Level']})")
+            elif len(high_risk_features) > 0:
+                st.warning(f"⚠️ **{len(high_risk_features)} high-risk features** need review")
+                for _, row in high_risk_features.head(3).iterrows():
+                    st.write(f"• **{row['Feature']}** (Risk Level: {row['Risk Level']})")
+            else:
+                st.success("✅ **No critical privacy risks** detected in current features")
+                
+            # Show dataset-specific insights
+            total_features = len(risk_df)
+            low_risk_count = len(risk_df[risk_df['Privacy Risk'] <= 2])
+            st.info(f"📊 **Privacy Summary**: {low_risk_count}/{total_features} features are low-risk")
         
         with col2:
-            st.write("**Compliance Checklist**")
-            checklist = [
-                "✅ Data inventory completed",
-                "✅ Sensitive features identified",
-                "✅ Privacy risk assessment conducted",
-                "✅ Bias analysis performed",
-                "✅ Model explainability provided"
-            ]
-            for item in checklist:
-                st.write(item)
+            st.write("**🎯 Domain-Specific Insights**")
+            
+            # Show domain-specific analysis
+            column_names = [col.lower() for col in self.data.columns]
+            domain_insights = []
+            
+            if any('loan' in col or 'credit' in col for col in column_names):
+                domain_insights.append("🏦 **Financial Services** data detected")
+                domain_insights.append("→ FCRA compliance required")
+                
+            if any('person' in col or 'gender' in col for col in column_names):
+                domain_insights.append("👤 **Personal Demographics** present")
+                domain_insights.append("→ EEOC bias monitoring needed")
+                
+            if any('income' in col or 'salary' in col for col in column_names):
+                domain_insights.append("💰 **Financial Information** identified")
+                domain_insights.append("→ Consider differential privacy")
+                
+            if any('age' in col for col in column_names):
+                domain_insights.append("📅 **Age Information** found")
+                domain_insights.append("→ ADEA compliance monitoring")
+            
+            if domain_insights:
+                for insight in domain_insights:
+                    st.write(insight)
+            else:
+                st.write("📋 **General dataset** - no specific domain patterns detected")
+                
+            # Dataset size context
+            total_records = len(self.data)
+            if total_records < 1000:
+                st.write(f"⚠️ **Small dataset** ({total_records:,} records)")
+                st.write("→ Limited statistical power for bias detection")
+            elif total_records > 100000:
+                st.write(f"📈 **Large dataset** ({total_records:,} records)")  
+                st.write("→ Consider sampling for efficient analysis")
+        
+        # Show actionable privacy risk visualization
+        st.subheader("📊 Privacy Risk Analysis")
+        
+        # Create a more useful visualization
+        high_risk_features = risk_df[risk_df['Privacy Risk'] >= 2].sort_values('Privacy Risk', ascending=True)
+        
+        if len(high_risk_features) > 0:
+            # Bar chart showing specific risky features
+            fig = px.bar(
+                high_risk_features.tail(10),  # Show top 10 risky features
+                x='Privacy Risk', 
+                y='Feature',
+                color='Risk Level',
+                orientation='h',
+                title="🔍 Features Requiring Privacy Attention",
+                color_discrete_map={
+                    'Critical': '#ff4444',
+                    'Very High': '#ff8800', 
+                    'High': '#ffaa00',
+                    'Medium': '#ffdd00',
+                    'Low': '#88dd00',
+                    'Very Low': '#44dd44'
+                }
+            )
+            fig.update_layout(height=400, yaxis={'categoryorder': 'total ascending'})
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Summary table of risky features
+            st.write("**🎯 Priority Features for Review:**")
+            priority_features = high_risk_features[['Feature', 'Risk Level', 'Privacy Risk']].tail(5)
+            st.dataframe(priority_features, use_container_width=True)
+        else:
+            st.success("✅ **Excellent Privacy Profile** - No features require special attention")
+            st.info("All features have low privacy risk scores")
         
         # Generate specialized recommendations based on actual analysis
         recommendations = self._generate_specialized_recommendations(
