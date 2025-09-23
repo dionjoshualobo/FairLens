@@ -56,6 +56,17 @@ except ImportError:
     CUSTOM_MODULES_AVAILABLE = False
     st.info("Custom modules not found. Using basic analysis only.")
 
+# Azure Integration
+try:
+    from azure_config import azure_config
+    from azure_storage_helper import azure_storage
+    from azure_ml_helper import azure_ml
+    AZURE_AVAILABLE = True
+    st.sidebar.success("☁️ Azure services connected")
+except ImportError:
+    AZURE_AVAILABLE = False
+    st.sidebar.warning("⚠️ Azure services not available")
+
 class ModelGovernanceAnalyzer:
     def __init__(self):
         self.data = None
@@ -2024,6 +2035,47 @@ def main():
     
     # Sidebar for navigation
     st.sidebar.title("📋 Analysis Steps")
+    
+    # Azure Status Dashboard
+    if AZURE_AVAILABLE:
+        with st.sidebar.expander("☁️ Azure Services Status", expanded=False):
+            try:
+                # Storage Status
+                storage_connected = azure_storage.blob_service_client is not None
+                if storage_connected:
+                    st.success("✅ Blob Storage Connected")
+                    datasets = azure_storage.list_datasets()
+                    st.write(f"📁 {len(datasets)} datasets available")
+                else:
+                    st.error("❌ Blob Storage Disconnected")
+                
+                # ML Status
+                ml_status = azure_ml.get_azure_ml_status()
+                if ml_status.get('connected', False):
+                    st.success(f"✅ ML Workspace: {ml_status['name']}")
+                    st.write(f"🌍 Region: {ml_status.get('region', 'N/A')}")
+                else:
+                    st.error("❌ ML Workspace Disconnected")
+                    
+                # Show deployment URL
+                st.info("🌐 **Production URL:**")
+                st.code("http://fairlens-app-dion.centralindia.azurecontainer.io:8501")
+                
+            except Exception as e:
+                st.error(f"❌ Azure Status Error: {e}")
+                st.write("Running in local mode due to connection issues")
+    else:
+        with st.sidebar.expander("⚠️ Azure Services", expanded=False):
+            st.warning("Azure services not available")
+            st.write("Running in **Demo Mode**")
+            st.info("💡 All analysis features are fully functional using local processing. Upload your own datasets or use the sample data to get started!")
+            st.write("**Demo Features:**")
+            st.write("✅ Bias Detection & Analysis")
+            st.write("✅ Privacy Risk Assessment") 
+            st.write("✅ Model Training & Explainability")
+            st.write("✅ Governance Reporting")
+            st.write("✅ Sample & Custom Dataset Support")
+    
     steps = [
         "1. Load Data",
         "1.5 Handle Missing Values",
@@ -2114,6 +2166,41 @@ def main():
         else:  # Upload Your Own Dataset
             st.info("📤 **Upload Your Own Data**: Upload a CSV file with your own dataset for custom analysis.")
             
+            # Azure Storage Integration
+            if AZURE_AVAILABLE:
+                st.info("☁️ **Cloud Storage**: Your uploaded files will be stored in Azure Blob Storage for processing.")
+                
+                # Show existing datasets from Azure
+                with st.expander("📁 View Existing Datasets in Azure Storage"):
+                    try:
+                        datasets = azure_storage.list_datasets()
+                        if datasets:
+                            st.write("**Available datasets in Azure Storage:**")
+                            for dataset in datasets:
+                                col1, col2, col3 = st.columns([3, 1, 1])
+                                with col1:
+                                    st.write(f"📄 {dataset['name']}")
+                                with col2:
+                                    st.write(f"{dataset['size']} bytes")
+                                with col3:
+                                    if st.button(f"Load", key=f"load_{dataset['name']}"):
+                                        df, message = azure_storage.download_blob_to_dataframe(dataset['name'])
+                                        if df is not None:
+                                            analyzer.data = df
+                                            st.session_state.data_loaded = True
+                                            st.session_state.analyzer = analyzer
+                                            st.success(f"✅ Loaded {dataset['name']} from Azure Storage!")
+                                            st.rerun()
+                                        else:
+                                            st.error(f"❌ {message}")
+                        else:
+                            st.write("No datasets found in Azure Storage")
+                    except Exception as e:
+                        st.warning(f"Could not connect to Azure Storage: {e}")
+                        st.info("💡 Continuing in local mode - you can still upload files directly!")
+            else:
+                st.info("📁 **Local Storage**: Files will be processed locally (Azure services not available).")
+            
             st.write("**Requirements for your dataset:**")
             st.write("✅ CSV format with headers")
             st.write("✅ At least 100 rows recommended")
@@ -2127,9 +2214,24 @@ def main():
             )
             
             if uploaded_file is not None:
+                # Load data locally first
                 if analyzer.load_data(uploaded_file):
                     st.session_state.data_loaded = True
                     st.session_state.analyzer = analyzer
+                    
+                    # Upload to Azure Storage if available
+                    if AZURE_AVAILABLE:
+                        with st.spinner("Uploading dataset to Azure Storage..."):
+                            try:
+                                success, message = azure_storage.upload_file_to_blob(uploaded_file)
+                                if success:
+                                    st.success(f"☁️ {message}")
+                                else:
+                                    st.warning(f"⚠️ Azure upload failed: {message}")
+                                    st.info("Don't worry - you can still continue with local analysis!")
+                            except Exception as e:
+                                st.warning(f"⚠️ Azure upload error: {e}")
+                                st.info("Don't worry - you can still continue with local analysis!")
     
     # Check if data is loaded
     if hasattr(st.session_state, 'data_loaded') and st.session_state.data_loaded:
