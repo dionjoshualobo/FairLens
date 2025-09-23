@@ -659,11 +659,35 @@ class ModelGovernanceAnalyzer:
             st.session_state.selected_sensitive = [col for col in categorical_cols if any(keyword in col.lower() 
                     for keyword in ['gender', 'race', 'ethnicity', 'age', 'education'])]
         
+        # Validate that session state defaults still exist in current dataset
+        valid_defaults = [col for col in st.session_state.selected_sensitive if col in categorical_cols]
+        
+        # Update session state if some defaults are no longer valid
+        if valid_defaults != st.session_state.selected_sensitive:
+            st.session_state.selected_sensitive = valid_defaults
+            
+        # If no valid defaults found, try to suggest new ones based on current dataset
+        if not st.session_state.selected_sensitive and categorical_cols:
+            # Smart suggestions based on common patterns
+            suggested = []
+            for col in categorical_cols:
+                col_lower = col.lower()
+                if any(keyword in col_lower for keyword in ['gender', 'sex', 'race', 'ethnicity']):
+                    suggested.append(col)
+            st.session_state.selected_sensitive = suggested[:2]  # Limit to 2 suggestions
+        
+        # Show helpful information about available categorical features
+        if categorical_cols:
+            st.info(f"📊 **Available categorical features**: {', '.join(categorical_cols)}")
+        else:
+            st.warning("⚠️ **No categorical features found** - you may need to convert some numerical features to categorical for bias analysis")
+        
         selected_sensitive = st.multiselect(
             "Select features to analyze for bias:",
             categorical_cols,
             default=st.session_state.selected_sensitive,
-            key="bias_sensitive_multiselect"
+            key="bias_sensitive_multiselect",
+            help="Choose demographic or sensitive attributes that could lead to unfair treatment (e.g., Gender, Age groups, etc.)"
         )
         
         # Update session state when selection changes
