@@ -1404,19 +1404,16 @@ class ModelGovernanceAnalyzer:
             for item in checklist:
                 st.write(item)
         
+        # Generate specialized recommendations based on actual analysis
+        recommendations = self._generate_specialized_recommendations(
+            risk_df, sensitive_features, identified_sensitive, report_data
+        )
+        
         # Recommendations
-        st.subheader("🎯 Key Recommendations")
+        st.subheader("🎯 Data-Specific Key Recommendations")
         
-        recommendations = [
-            "1. **High Priority**: Address high-risk privacy features through anonymization or removal",
-            "2. **Bias Mitigation**: Implement fairness constraints in model training",
-            "3. **Monitoring**: Set up continuous monitoring for model bias and drift",
-            "4. **Documentation**: Maintain comprehensive model documentation",
-            "5. **Training**: Ensure team is trained on responsible AI practices"
-        ]
-        
-        for rec in recommendations:
-            st.write(rec)
+        for i, rec in enumerate(recommendations, 1):
+            st.write(f"{i}. {rec}")
         
         # Export functionality
         st.subheader("📤 Export Report")
@@ -1443,8 +1440,8 @@ Generated on: {report_data['report_date']}
 ### Analyzed Features:
 {chr(10).join(f"- {feature}" for feature in sensitive_features)}
 
-## Recommendations
-{chr(10).join(recommendations)}
+## Data-Specific Recommendations
+{chr(10).join([f"{i}. {rec}" for i, rec in enumerate(recommendations, 1)])}
             """
             
             st.download_button(
@@ -1453,8 +1450,161 @@ Generated on: {report_data['report_date']}
                 file_name=f"governance_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                 mime="text/plain"
             )
-
-def main():
+    
+    def _generate_specialized_recommendations(self, risk_df, sensitive_features, identified_sensitive, report_data):
+        """Generate specialized recommendations based on actual data analysis"""
+        recommendations = []
+        
+        # Privacy-specific recommendations
+        high_risk_features = risk_df[risk_df['Privacy Risk'] >= 3]['Feature'].tolist()
+        critical_risk_features = risk_df[risk_df['Privacy Risk'] >= 4]['Feature'].tolist()
+        
+        if critical_risk_features:
+            recommendations.append(
+                f"🚨 **CRITICAL PRIVACY RISK**: Immediately review columns {', '.join(critical_risk_features)} - "
+                f"these likely contain personally identifiable information that should be anonymized or removed"
+            )
+        elif high_risk_features:
+            recommendations.append(
+                f"🔴 **High Privacy Priority**: Assess columns {', '.join(high_risk_features)} for anonymization - "
+                f"these have high uniqueness or contain sensitive patterns"
+            )
+        else:
+            recommendations.append("✅ **Privacy Assessment**: No critical privacy risks detected in current features")
+        
+        # Sensitive feature recommendations
+        if 'personal_id' in identified_sensitive:
+            id_features = identified_sensitive['personal_id']
+            recommendations.append(
+                f"🔐 **Identity Protection**: Remove or hash identifier columns {', '.join(id_features)} "
+                f"before model deployment to prevent re-identification"
+            )
+        
+        if 'location' in identified_sensitive:
+            location_features = identified_sensitive['location']
+            recommendations.append(
+                f"🌍 **Location Privacy**: Consider geographic aggregation for {', '.join(location_features)} "
+                f"to reduce location-based discrimination while preserving utility"
+            )
+        
+        if 'financial' in identified_sensitive:
+            financial_features = identified_sensitive['financial']
+            recommendations.append(
+                f"💰 **Financial Data**: Apply differential privacy or binning to {', '.join(financial_features)} "
+                f"to protect sensitive financial information"
+            )
+        
+        # Bias-specific recommendations
+        if sensitive_features:
+            if 'gender' in str(sensitive_features).lower() or 'gender' in identified_sensitive:
+                recommendations.append(
+                    "⚖️ **Gender Bias Mitigation**: Implement fairness constraints (demographic parity or equalized odds) "
+                    "to ensure equal treatment across gender groups - required for EEOC compliance"
+                )
+            
+            if 'race' in str(sensitive_features).lower() or 'race' in identified_sensitive:
+                recommendations.append(
+                    "🤝 **Racial Fairness**: Apply bias testing and mitigation techniques - "
+                    "consider using fairlearn's postprocessing methods for equal opportunity"
+                )
+            
+            if 'age' in str(sensitive_features).lower() or 'age' in identified_sensitive:
+                recommendations.append(
+                    "👥 **Age Discrimination**: Ensure compliance with Age Discrimination in Employment Act (ADEA) - "
+                    "monitor for disparate impact on age groups 40+"
+                )
+        else:
+            recommendations.append(
+                "📊 **Bias Analysis**: Consider analyzing additional demographic features for fairness assessment"
+            )
+        
+        # Dataset size and quality recommendations
+        total_records = report_data['dataset_info']['total_records']
+        missing_pct = (report_data['dataset_info']['missing_values'] / 
+                      (total_records * report_data['dataset_info']['total_features'])) * 100
+        
+        if total_records < 1000:
+            recommendations.append(
+                f"⚠️ **Sample Size**: Dataset has only {total_records:,} records - "
+                "consider collecting more data for robust model performance and bias detection"
+            )
+        elif total_records > 100000:
+            recommendations.append(
+                f"📈 **Large Dataset**: With {total_records:,} records, implement sampling strategies "
+                "for efficient bias monitoring and consider distributed fairness assessment"
+            )
+        
+        if missing_pct > 10:
+            recommendations.append(
+                f"🔧 **Data Quality**: {missing_pct:.1f}% missing data detected - "
+                "implement robust missing value strategies and document impact on fairness metrics"
+            )
+        
+        # Domain-specific recommendations
+        column_names = [col.lower() for col in self.data.columns]
+        
+        if any('loan' in col or 'credit' in col for col in column_names):
+            recommendations.append(
+                "🏦 **Financial Services**: Implement FCRA compliance measures, document model decisions "
+                "for adverse action notices, and regularly audit for redlining patterns"
+            )
+        
+        if any('medical' in col or 'health' in col for col in column_names):
+            recommendations.append(
+                "🏥 **Healthcare Data**: Ensure HIPAA compliance, implement health equity monitoring, "
+                "and consider social determinants of health in fairness assessment"
+            )
+        
+        if any('employ' in col or 'hire' in col or 'job' in col for col in column_names):
+            recommendations.append(
+                "💼 **Employment Decisions**: Follow EEOC guidelines, implement 4/5ths rule testing, "
+                "and document job-relatedness of all features used in hiring models"
+            )
+        
+        # Model performance and monitoring recommendations
+        if hasattr(self, 'model') and self.model is not None:
+            model_name = type(self.model).__name__
+            
+            if 'Forest' in model_name:
+                recommendations.append(
+                    "🌳 **Random Forest Monitoring**: Set up feature importance drift detection "
+                    "and monitor for changes in tree structure that might indicate bias shifts"
+                )
+            elif 'Gradient' in model_name:
+                recommendations.append(
+                    "📊 **Gradient Boosting Oversight**: Implement early stopping to prevent overfitting "
+                    "on sensitive attributes and monitor boosting iterations for bias amplification"
+                )
+            elif 'Linear' in model_name or 'Logistic' in model_name:
+                recommendations.append(
+                    "📈 **Linear Model Transparency**: Leverage coefficient interpretability for bias explanation "
+                    "and implement regular coefficient stability monitoring"
+                )
+        
+        # Regulatory and compliance recommendations
+        recommendations.append(
+            "📋 **Documentation**: Maintain model cards documenting training data, performance metrics, "
+            "limitations, and fairness evaluations for regulatory compliance"
+        )
+        
+        recommendations.append(
+            "🔄 **Continuous Monitoring**: Implement automated bias monitoring in production "
+            "with alerts for fairness metric degradation and regular retraining schedules"
+        )
+        
+        # Training and organizational recommendations
+        if len(identified_sensitive) > 3:
+            recommendations.append(
+                "🎓 **Team Training**: Conduct specialized bias training given the high number of sensitive attributes - "
+                "ensure team understands intersectional bias and multiple protected class interactions"
+            )
+        else:
+            recommendations.append(
+                "📚 **Basic Training**: Ensure team completes responsible AI training covering "
+                "bias detection, fairness metrics, and ethical considerations"
+            )
+        
+        return recommendations
     st.set_page_config(
         page_title="AI Model Governance & Fairness Analyzer",
         page_icon="⚖️",
