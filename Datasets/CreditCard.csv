@@ -1,0 +1,12 @@
+Gender,Age,Debt,Married,EducationLevel,YearsEmployed,Ethnicity,CreditScore,Citizen,ZipCode,Income,ApprovalStatus
+male,30.83,0.0,unknown,cc,1.25,v,1.0,native,202,3.0,Rejected
+female,58.67,4.46,yes,ff,3.04,v,6.0,native,43,560.0,Approved
+female,24.5,0.5,yes,ff,1.5,h,4.0,foreign,280,824.0,Rejected
+male,27.83,1.54,yes,ff,3.75,h,5.0,native,100,3.0,Approved
+male,20.17,5.62,no,aa,1.71,v,4.0,native,120,3.0,Rejected
+female,32.08,4.0,unknown,cc,1.25,v,3.0,permanent,360,3.0,Approved
+male,33.17,1.04,unknown,cc,6.0,v,4.0,native,164,3.0,Rejected
+female,45.83,6.5,yes,ff,0.0,v,4.0,native,80,1.0,Approved
+female,36.67,4.46,yes,cc,0.75,v,4.0,native,52,2.0,Approved
+female,28.25,0.3,yes,ff,0.5,v,4.0,foreign,60,3.0,Rejected
+
