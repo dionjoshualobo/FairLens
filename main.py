@@ -653,12 +653,26 @@ class ModelGovernanceAnalyzer:
         st.subheader("🎯 Select Sensitive Features for Bias Analysis")
         
         # Let user select sensitive features
+        # Use session state to remember previous selections
+        if 'selected_sensitive' not in st.session_state:
+            # Initialize with smart defaults only on first visit
+            st.session_state.selected_sensitive = [col for col in categorical_cols if any(keyword in col.lower() 
+                    for keyword in ['gender', 'race', 'ethnicity', 'age', 'education'])]
+        
         selected_sensitive = st.multiselect(
             "Select features to analyze for bias:",
             categorical_cols,
-            default=[col for col in categorical_cols if any(keyword in col.lower() 
-                    for keyword in ['gender', 'race', 'ethnicity', 'age', 'education'])]
+            default=st.session_state.selected_sensitive,
+            key="bias_sensitive_multiselect"
         )
+        
+        # Update session state when selection changes
+        if selected_sensitive != st.session_state.selected_sensitive:
+            st.session_state.selected_sensitive = selected_sensitive
+        
+        # Show current selections for user feedback
+        if selected_sensitive:
+            st.success(f"📊 **Selected sensitive features**: {', '.join(selected_sensitive)}")
         
         if not selected_sensitive:
             st.warning("Please select at least one sensitive feature for bias analysis.")
@@ -704,7 +718,30 @@ class ModelGovernanceAnalyzer:
                 unique_count = self.data[col].nunique()
                 st.write(f"- {col} ({unique_count} unique)")
         
-        target_col = st.selectbox("Select target variable:", self.data.columns.tolist())
+        # Use session state to remember target variable selection
+        if 'target_col' not in st.session_state:
+            st.session_state.target_col = self.data.columns[0]  # Default to first column
+        
+        # Find the index of the previously selected target variable
+        try:
+            current_index = self.data.columns.tolist().index(st.session_state.target_col)
+        except (ValueError, AttributeError):
+            current_index = 0  # Fallback to first column if previous selection not found
+        
+        target_col = st.selectbox(
+            "Select target variable:", 
+            self.data.columns.tolist(),
+            index=current_index,
+            key="bias_target_selectbox"
+        )
+        
+        # Update session state when target variable changes
+        if target_col != st.session_state.target_col:
+            st.session_state.target_col = target_col
+        
+        # Show current target selection for user feedback
+        if target_col:
+            st.success(f"🎯 **Selected target variable**: {target_col}")
         
         if target_col:
             # Analyze target variable
