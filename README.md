@@ -331,6 +331,18 @@ Advanced explainability features include:
 - Physical safeguards evaluation
 - Minimum necessary standard
 
+### Indian Compliance Frameworks
+#### DPDP Act (Digital Personal Data Protection Act, 2023)
+- Data processing consent management
+- Data principal rights assessment
+- Data fiduciary obligations review
+- Cross-border data transfer compliance
+
+#### IT Act (Information Technology Act, 2000)
+- Sensitive personal data protection
+- Reasonable security practices evaluation
+- Data breach notification review
+
 ## Export & Reporting
 
 The tool generates comprehensive reports including:
