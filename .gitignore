@@ -128,7 +128,10 @@ ENV/
 env.bak/
 venv.bak/
 fairlens-env/
+<<<<<<< HEAD
 
+=======
+>>>>>>> readmefiles-modification
 # Spyder project settings
 .spyderproject
 .spyproject
