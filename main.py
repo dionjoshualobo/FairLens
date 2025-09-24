@@ -34,11 +34,8 @@ except ImportError:
 try:
     import shap
     SHAP_AVAILABLE = True
-    st.sidebar.success("✅ SHAP available for explainability")
 except ImportError:
     SHAP_AVAILABLE = False
-    st.sidebar.warning("⚠️ SHAP not installed")
-    st.sidebar.code("pip install shap", language="bash")
 
 # Privacy and Data Analysis
 import re
@@ -62,10 +59,8 @@ try:
     from azure_storage_helper import azure_storage
     from azure_ml_helper import azure_ml
     AZURE_AVAILABLE = True
-    st.sidebar.success("☁️ Azure services connected")
 except ImportError:
     AZURE_AVAILABLE = False
-    st.sidebar.warning("⚠️ Azure services not available")
 
 class ModelGovernanceAnalyzer:
     def __init__(self):
@@ -707,7 +702,7 @@ class ModelGovernanceAnalyzer:
         
         # Show current selections for user feedback
         if selected_sensitive:
-            st.success(f"📊 **Selected sensitive features**: {', '.join(selected_sensitive)} (persisted across pages)")
+            st.success(f"📊 **Selected sensitive features**: {', '.join(selected_sensitive)}")
         
         if not selected_sensitive:
             st.warning("Please select at least one sensitive feature for bias analysis.")
@@ -778,7 +773,7 @@ class ModelGovernanceAnalyzer:
         
         # Show current target selection for user feedback
         if target_col:
-            st.success(f"🎯 **Selected target variable**: {target_col} (persisted across pages)")
+            st.success(f"🎯 **Selected target variable**: {target_col}")
         
         if target_col:
             # Analyze target variable
@@ -2454,46 +2449,108 @@ def main():
                 st.warning("Please complete previous analysis steps first.")
 
         elif "8. Overview Report (For Everyone)" in selected_step:
-            if hasattr(st.session_state, 'risk_df'):
-                st.header("📝 Overview Report (For Everyone)")
-                st.markdown(
-                    "This section gives a simple summary of your data and its risks, using plain language and easy-to-understand visuals. No technical terms!"
-                )
-                # Simple summary of critical features
-                risk_df = st.session_state.risk_df
-                critical_risk_features = risk_df[risk_df['Privacy Risk'] >= 4]
-                high_risk_features = risk_df[(risk_df['Privacy Risk'] == 3)]
-                if len(critical_risk_features) > 0:
-                    feature_names = ', '.join([str(row['Feature']) for _, row in critical_risk_features.head(3).iterrows()])
-                    st.error(f"Some information in your data (like {feature_names}) is very private and could identify someone. Please be careful with this data.")
+            st.header("📝 Overview Report")
+            st.markdown("A simple summary of your data analysis using easy-to-understand language.")
+            
+            col1, col2 = st.columns(2)
+            
+            # Privacy Analysis Summary
+            with col1:
+                st.subheader("🔒 Privacy Analysis")
+                if hasattr(st.session_state, 'risk_df'):
+                    risk_df = st.session_state.risk_df
+                    critical_risk_features = risk_df[risk_df['Privacy Risk'] >= 4]
+                    high_risk_features = risk_df[(risk_df['Privacy Risk'] == 3)]
+                    safe_count = (risk_df['Privacy Risk'] <= 2).sum()
+                    risky_count = (risk_df['Privacy Risk'] > 2).sum()
+                    
+                    if len(critical_risk_features) > 0:
+                        st.error("⚠️ High privacy risk detected")
+                        st.write(f"**{len(critical_risk_features)} features** could identify individuals")
+                        # Show specific features
+                        critical_feature_names = critical_risk_features['Feature'].tolist()
+                        st.write(f"**High-risk features:** {', '.join(critical_feature_names)}")
+                    elif len(high_risk_features) > 0:
+                        st.warning("⚠️ Some privacy concerns")
+                        st.write(f"**{len(high_risk_features)} features** need attention")
+                        # Show specific features
+                        high_risk_feature_names = high_risk_features['Feature'].tolist()
+                        st.write(f"**Concerning features:** {', '.join(high_risk_feature_names)}")
+                    else:
+                        st.success("✅ Good privacy protection")
+                        st.write("No major privacy risks found")
+                    
+                    st.write(f"**Safe features:** {safe_count} | **Risky features:** {risky_count}")
                 else:
-                    st.success("Your data does not have any information that could easily identify someone.")
-                # Simple privacy risk bar chart
-                st.subheader("Privacy Risk in Your Data")
-                simple_risk = risk_df[['Feature', 'Privacy Risk']].copy()
-                simple_risk = simple_risk.sort_values('Privacy Risk', ascending=False).head(5)
-                st.bar_chart(simple_risk.set_index('Feature'))
-                # Simple count of safe vs risky features
-                safe_count = (risk_df['Privacy Risk'] <= 2).sum()
-                risky_count = (risk_df['Privacy Risk'] > 2).sum()
-                st.info(f"Out of all the things in your data, {safe_count} are safe and {risky_count} need some care.")
-                # Data-specific recommendations
-                st.subheader("What Should You Do?")
-                recs = []
-                if len(critical_risk_features) > 0:
-                    recs.append(f"Remove or anonymize the following very private information: {', '.join([str(row['Feature']) for _, row in critical_risk_features.iterrows()])}.")
-                if len(high_risk_features) > 0:
-                    recs.append(f"Review and protect these sensitive features: {', '.join([str(row['Feature']) for _, row in high_risk_features.iterrows()])}.")
-                if risky_count == 0:
-                    recs.append("Your data is generally safe. Just keep it secure and private.")
-                if safe_count > risky_count and risky_count > 0:
-                    recs.append("Most of your data is safe, but pay attention to the risky features above.")
-                if not recs:
-                    recs.append("No special action needed. Keep your data safe and secure.")
-                for rec in recs:
-                    st.markdown(f"- {rec}")
+                    st.info("Complete privacy analysis first")
+            
+            # Bias Analysis Summary  
+            with col2:
+                st.subheader("⚖️ Bias Analysis")
+                if hasattr(st.session_state, 'selected_sensitive') and st.session_state.selected_sensitive:
+                    sensitive_features = st.session_state.selected_sensitive
+                    st.success("✅ Bias analysis configured")
+                    st.write(f"**Monitoring {len(sensitive_features)} sensitive attributes:**")
+                    for feature in sensitive_features[:3]:  # Show top 3
+                        st.write(f"• {feature}")
+                    
+                    # Check if we have bias analysis results
+                    if hasattr(st.session_state, 'bias_analysis_results'):
+                        results = st.session_state.bias_analysis_results
+                        if 'demographic_parity' in results:
+                            parity_score = results['demographic_parity']
+                            if parity_score > 0.1:
+                                st.warning(f"⚠️ Potential bias detected (score: {parity_score:.3f})")
+                            else:
+                                st.success(f"✅ Fair outcomes (score: {parity_score:.3f})")
+                else:
+                    st.info("Select sensitive features for bias analysis")
+            
+            # Overall Recommendations
+            st.subheader("💡 Key Recommendations")
+            recommendations = []
+            
+            # Privacy recommendations - data specific
+            if hasattr(st.session_state, 'risk_df'):
+                risk_df = st.session_state.risk_df
+                critical_features = risk_df[risk_df['Privacy Risk'] >= 4]
+                high_risk_features = risk_df[(risk_df['Privacy Risk'] == 3)]
+                
+                if len(critical_features) > 0:
+                    feature_names = ', '.join(critical_features['Feature'].tolist())
+                    recommendations.append(f"🔒 Remove or anonymize: {feature_names}")
+                elif len(high_risk_features) > 0:
+                    feature_names = ', '.join(high_risk_features['Feature'].tolist())
+                    recommendations.append(f"🔒 Review and protect: {feature_names}")
+                else:
+                    recommendations.append("🔒 Maintain current privacy practices")
+            
+            # Bias recommendations - data specific
+            if hasattr(st.session_state, 'selected_sensitive') and st.session_state.selected_sensitive:
+                sensitive_features = st.session_state.selected_sensitive
+                if hasattr(st.session_state, 'bias_analysis_results'):
+                    results = st.session_state.bias_analysis_results
+                    if 'demographic_parity' in results and results['demographic_parity'] > 0.1:
+                        feature_names = ', '.join(sensitive_features[:2])  # Show first 2 features
+                        recommendations.append(f"⚖️ Implement bias mitigation for: {feature_names}")
+                    else:
+                        feature_names = ', '.join(sensitive_features[:2])
+                        recommendations.append(f"⚖️ Continue monitoring fairness for: {feature_names}")
+                else:
+                    feature_names = ', '.join(sensitive_features[:2])
+                    recommendations.append(f"⚖️ Monitor bias levels for: {feature_names}")
             else:
-                st.info("Please complete privacy analysis first.")
+                recommendations.append("⚖️ Identify sensitive attributes for fairness monitoring")
+            
+            if not recommendations:
+                recommendations = ["✅ Your data analysis is complete and looks good!"]
+                
+            for i, rec in enumerate(recommendations, 1):
+                st.write(f"{i}. {rec}")
+                
+            if not (hasattr(st.session_state, 'risk_df') or 
+                   (hasattr(st.session_state, 'selected_sensitive') and st.session_state.selected_sensitive)):
+                st.info("💡 Complete the privacy and bias analysis steps to see detailed recommendations.")
     
     else:
         st.info("👆 Please load your data first using the sidebar.")
