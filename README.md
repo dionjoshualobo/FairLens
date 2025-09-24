@@ -1,12 +1,12 @@
 # AI Model Governance & Fairness Analysis Tool
 
 ## 🌐 Live Demo
-Access the live application: **[https://fairlens-app-dion-v21-azure-ml.centralindia.azurecontainer.io:8501](http://fairlens-app-dion-v21-azure-ml.centralindia.azurecontainer.io:8501)**
+Access the live application: **[http://fairlens-v21-ml.centralindia.azurecontainer.io:8501](http://fairlens-v21-ml.centralindia.azurecontainer.io:8501)**
 
 > 🤖 **Azure ML Integration**: This version includes enhanced Azure ML features for cloud-based model training, experiment tracking, and advanced bias detection.
 
 ### Available Versions
-- **v21 (Azure ML Branch)**: [fairlens-app-dion-v21-azure-ml.centralindia.azurecontainer.io:8501](http://fairlens-app-dion-v21-azure-ml.centralindia.azurecontainer.io:8501) - Latest with Azure ML integration
+- **v21 (Azure ML Branch)**: [fairlens-v21-ml.centralindia.azurecontainer.io:8501](http://fairlens-v21-ml.centralindia.azurecontainer.io:8501) - Latest with Azure ML integration ✨
 - **v19 (Main/Stable)**: [fairlens-app-dion-v19.centralindia.azurecontainer.io:8501](http://fairlens-app-dion-v19.centralindia.azurecontainer.io:8501) - Stable production version
 
 ## Overview
