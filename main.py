@@ -631,10 +631,8 @@ class ModelGovernanceAnalyzer:
         recommendations = []
         if high_risk_features:
             recommendations.append("🔴 **High Priority**: Consider anonymizing or removing high-risk features: " + ", ".join(high_risk_features))
-        
         if 'gender' in str(identified_sensitive.get('gender', [])).lower():
             recommendations.append("⚖️ **Fairness**: Gender detected - ensure compliance with anti-discrimination laws")
-        
         if 'age' in str(identified_sensitive.get('age', [])).lower():
             recommendations.append("👥 **Age Discrimination**: Age-related features detected - verify ADEA compliance")
         
@@ -938,6 +936,107 @@ class ModelGovernanceAnalyzer:
             st.write(f"- Size: {len(self.y_test)}")
             st.write(f"- Distribution: {dict(self.y_test.value_counts())}")
         
+        # Azure ML Training Options
+        st.subheader("🚀 Training Options")
+        
+        training_option = st.radio(
+            "Choose training environment:",
+            ["Local Training (Fast)", "Azure ML Training (Scalable)"],
+            help="Local training runs on your machine, Azure ML uses cloud compute resources for better scalability"
+        )
+        
+        if training_option == "Azure ML Training (Scalable)" and AZURE_AVAILABLE:
+            return self._train_models_azure_ml(target_col, sensitive_features, label_encoders)
+        else:
+            if training_option == "Azure ML Training (Scalable)" and not AZURE_AVAILABLE:
+                st.warning("⚠️ Azure ML not available. Falling back to local training.")
+            return self._train_models_local(label_encoders)
+    
+    def _train_models_azure_ml(self, target_col, sensitive_features, label_encoders):
+        """Train models using Azure ML"""
+        st.info("🔄 Preparing data for Azure ML training...")
+        
+        # Prepare full dataset for Azure ML
+        full_data = self.data.copy()
+        
+        model_types = ['RandomForest', 'LogisticRegression', 'GradientBoosting']
+        model_results = {}
+        
+        # Allow user to select which models to train on Azure ML
+        selected_models = st.multiselect(
+            "Select models to train on Azure ML:",
+            model_types,
+            default=['RandomForest'],
+            help="Training multiple models on Azure ML may take longer but provides better comparison"
+        )
+        
+        if not selected_models:
+            st.warning("Please select at least one model to train.")
+            return None, None
+        
+        # Train selected models on Azure ML
+        for model_type in selected_models:
+            with st.spinner(f"Training {model_type} on Azure ML..."):
+                try:
+                    result = azure_ml.train_model_on_azure_ml(
+                        data=full_data,
+                        target_column=target_col,
+                        model_type=model_type,
+                        sensitive_features=sensitive_features
+                    )
+                    
+                    if result:
+                        model_results[model_type] = result
+                        
+                        # Register model in Azure ML Model Registry
+                        model_name = f"fairlens-{model_type.lower()}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                        azure_ml.register_model_in_azure_ml(
+                            model=result['model'],
+                            model_name=model_name,
+                            model_type=model_type,
+                            accuracy=result['accuracy'],
+                            sensitive_features=sensitive_features
+                        )
+                        
+                        st.success(f"✅ {model_type} trained on Azure ML (Accuracy: {result['accuracy']:.4f})")
+                    else:
+                        st.error(f"❌ Failed to train {model_type} on Azure ML")
+                        
+                except Exception as e:
+                    st.error(f"❌ Error training {model_type} on Azure ML: {str(e)}")
+                    continue
+        
+        if not model_results:
+            st.error("❌ No models were trained successfully on Azure ML.")
+            return None, None
+        
+        # Display Azure ML results
+        st.subheader("📊 Azure ML Training Results")
+        
+        results_data = []
+        for model_name, result in model_results.items():
+            results_data.append({
+                'Model': model_name,
+                'Accuracy': result['accuracy'],
+                'Training Location': result.get('training_location', 'Azure ML'),
+                'Job Name': result.get('azure_job_name', 'N/A')
+            })
+        
+        results_df = pd.DataFrame(results_data).sort_values('Accuracy', ascending=False)
+        st.dataframe(results_df)
+        
+        # Select best model
+        best_model_name = results_df.iloc[0]['Model']
+        self.model = model_results[best_model_name]['model']
+        
+        st.success(f"🏆 Best Azure ML model: {best_model_name} (Accuracy: {model_results[best_model_name]['accuracy']:.4f})")
+        
+        return model_results, label_encoders
+    
+    def _train_models_local(self, label_encoders):
+        """Train models locally (original implementation)"""
+        st.info("🖥️ Training models locally...")
+        
         # Train models
         models = {
             'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42),
@@ -961,7 +1060,12 @@ class ModelGovernanceAnalyzer:
                     # Calculate simple accuracy manually
                     accuracy = np.mean(self.y_test == y_pred)
                 
-                model_results[name] = {'model': model, 'accuracy': accuracy, 'predictions': y_pred}
+                model_results[name] = {
+                    'model': model, 
+                    'accuracy': accuracy, 
+                    'predictions': y_pred,
+                    'training_location': 'Local'
+                }
                 st.write(f"✅ {name} trained successfully (Accuracy: {accuracy:.4f})")
                 
                 # Additional model diagnostics
@@ -982,7 +1086,8 @@ class ModelGovernanceAnalyzer:
         # Display results
         results_df = pd.DataFrame({
             'Model': list(model_results.keys()),
-            'Accuracy': [results['accuracy'] for results in model_results.values()]
+            'Accuracy': [results['accuracy'] for results in model_results.values()],
+            'Training Location': [results.get('training_location', 'Local') for results in model_results.values()]
         }).sort_values('Accuracy', ascending=False)
         
         st.dataframe(results_df)
@@ -1745,6 +1850,20 @@ class ModelGovernanceAnalyzer:
         # Export functionality
         st.subheader("Export Report")
         if st.button("Generate Detailed Report"):
+            # Create report data structure
+            report_data = {
+                'report_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'dataset_info': {
+                    'total_records': len(self.data),
+                    'total_features': len(self.data.columns),
+                    'missing_values': self.data.isnull().sum().sum()
+                },
+                'privacy_assessment': {
+                    'high_risk_features': risk_df[risk_df['Privacy Risk'] >= 3]['Feature'].tolist(),
+                    'identified_sensitive_categories': list(identified_sensitive.keys())
+                }
+            }
+            
             # Get bias metrics if available
             bias_metrics_text = ""
             if hasattr(self, 'model') and self.model is not None and hasattr(st.session_state, 'model_results'):
@@ -2053,6 +2172,54 @@ def main():
             st.write("✅ Model Training & Explainability")
             st.write("✅ Governance Reporting")
             st.write("✅ Sample & Custom Dataset Support")
+
+    # Azure ML Management Section
+    if AZURE_AVAILABLE:
+        with st.sidebar.expander("🤖 Azure ML Management", expanded=False):
+            try:
+                ml_status = azure_ml.get_azure_ml_status()
+                
+                if ml_status.get('connected', False):
+                    st.success("🔗 Azure ML Connected")
+                    
+                    # Model Registry
+                    st.subheader("📋 Model Registry")
+                    if st.button("🔍 List Registered Models", key="list_models"):
+                        with st.spinner("Loading registered models..."):
+                            models = azure_ml.list_registered_models()
+                            if models:
+                                for model in models[:5]:  # Show first 5
+                                    st.text(f"• {model['name']} v{model['version']}")
+                            else:
+                                st.info("No models registered yet")
+                    
+                    # Experiments
+                    st.subheader("🧪 Experiments")
+                    if st.button("📊 View Recent Experiments", key="list_experiments"):
+                        with st.spinner("Loading experiments..."):
+                            experiments = azure_ml.list_experiments()
+                            if experiments:
+                                for exp in experiments[:3]:  # Show first 3
+                                    st.text(f"• {exp['name']} - {exp['status']}")
+                            else:
+                                st.info("No experiments found")
+                    
+                    # Compute Status
+                    st.subheader("💻 Compute")
+                    if st.button("⚡ Check Compute Status", key="compute_status"):
+                        with st.spinner("Checking compute..."):
+                            compute_info = azure_ml.get_compute_status()
+                            if compute_info:
+                                st.success(f"✅ {compute_info['active_clusters']} clusters active")
+                            else:
+                                st.info("No active compute clusters")
+                                
+                else:
+                    st.error("❌ Azure ML Disconnected")
+                    st.info("💡 Enable Azure ML for:\n• Cloud model training\n• Experiment tracking\n• Model versioning\n• Automated bias monitoring")
+                    
+            except Exception as e:
+                st.error(f"Azure ML Error: {str(e)[:100]}...")
     
     steps = [
     "1. Load Data",
@@ -2398,43 +2565,203 @@ def main():
         
         elif "5. Model Training" in selected_step:
             if hasattr(st.session_state, 'selected_sensitive') and hasattr(st.session_state, 'target_col'):
-                # Check if model is already trained for the current target and sensitive features
-                cache_key = f"{st.session_state.target_col}_{str(st.session_state.selected_sensitive)}"
-                if (
-                    hasattr(st.session_state, 'model_results') and 
-                    hasattr(st.session_state, 'label_encoders') and 
-                    hasattr(st.session_state, 'model_cache_key') and 
-                    st.session_state.model_cache_key == cache_key
-                ):
-                    st.info("Model already trained for current selection. Skipping retraining.")
-                    model_results = st.session_state.model_results
-                    label_encoders = st.session_state.label_encoders
-                else:
-                    try:
-                        model_results, label_encoders = analyzer.train_models(
-                            st.session_state.target_col, 
-                            st.session_state.selected_sensitive
-                        )
-                        if model_results is not None and label_encoders is not None:
-                            st.session_state.model_results = model_results
-                            st.session_state.label_encoders = label_encoders
-                            st.session_state.model_cache_key = cache_key
+                
+                # Azure ML Training Options
+                if AZURE_AVAILABLE:
+                    st.header("🤖 Model Training Options")
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.subheader("🖥️ Local Training")
+                        st.info("Train models locally using your current computing resources")
+                        local_training = st.button("🏃‍♂️ Train Models Locally", type="primary")
+                    
+                    with col2:
+                        st.subheader("☁️ Azure ML Training")
+                        ml_status = azure_ml.get_azure_ml_status()
+                        
+                        if ml_status.get('connected', False):
+                            st.success("✅ Azure ML Available")
+                            st.info("Train models on Azure ML compute with experiment tracking")
+                            
+                            # Azure ML Configuration
+                            with st.expander("⚙️ Azure ML Configuration"):
+                                compute_target = st.selectbox(
+                                    "Compute Target",
+                                    ["cpu-cluster", "gpu-cluster", "auto-create"],
+                                    help="Select compute cluster for training"
+                                )
+                                
+                                experiment_name = st.text_input(
+                                    "Experiment Name",
+                                    value=f"fairlens-experiment-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+                                    help="Name for tracking this experiment"
+                                )
+                                
+                                enable_monitoring = st.checkbox(
+                                    "Enable Bias Monitoring",
+                                    value=True,
+                                    help="Track fairness metrics during training"
+                                )
+                            
+                            azure_training = st.button("☁️ Train on Azure ML", type="secondary")
                         else:
-                            st.error("❌ Model training failed. Please check your data and try again.")
-                            return
-                    except Exception as e:
-                        st.error(f"❌ Error in model training: {str(e)}")
-                        st.info("Please check your data quality and try again.")
-                        return
-                # Calculate fairness metrics
-                if FAIRLEARN_AVAILABLE:
-                    analyzer.fairness_metrics(
-                        st.session_state.selected_sensitive,
-                        model_results,
-                        label_encoders
-                    )
+                            st.error("❌ Azure ML Disconnected")
+                            st.info("Azure ML training requires connection to workspace")
+                            azure_training = False
+                    
+                    # Training Logic
+                    training_method = None
+                    if local_training:
+                        training_method = "local"
+                    elif azure_training:
+                        training_method = "azure"
+                    
+                    if training_method:
+                        # Check cache
+                        cache_key = f"{st.session_state.target_col}_{str(st.session_state.selected_sensitive)}_{training_method}"
+                        
+                        if (
+                            hasattr(st.session_state, 'model_results') and 
+                            hasattr(st.session_state, 'label_encoders') and 
+                            hasattr(st.session_state, 'model_cache_key') and 
+                            st.session_state.model_cache_key == cache_key
+                        ):
+                            st.info("✅ Model already trained for current selection. Using cached results.")
+                            model_results = st.session_state.model_results
+                            label_encoders = st.session_state.label_encoders
+                        else:
+                            try:
+                                if training_method == "local":
+                                    st.info("🖥️ Training models locally...")
+                                    model_results, label_encoders = analyzer.train_models(
+                                        st.session_state.target_col, 
+                                        st.session_state.selected_sensitive
+                                    )
+                                    
+                                elif training_method == "azure":
+                                    st.info("☁️ Training models on Azure ML...")
+                                    
+                                    # Prepare data for Azure ML
+                                    X = analyzer.data.drop(columns=[st.session_state.target_col])
+                                    y = analyzer.data[st.session_state.target_col]
+                                    sensitive_features = {
+                                        col: analyzer.data[col] for col in st.session_state.selected_sensitive
+                                    }
+                                    
+                                    # Train on Azure ML using the train_model method
+                                    st.info("🚀 Training models on Azure ML...")
+                                    model_results = {}
+                                    
+                                    # Train each model type on Azure ML
+                                    model_types = ['RandomForest', 'LogisticRegression', 'GradientBoosting']
+                                    for model_type in model_types:
+                                        with st.spinner(f"Training {model_type} on Azure ML..."):
+                                            result = azure_ml.train_model_on_azure_ml(
+                                                data=analyzer.data,
+                                                target_column=st.session_state.target_col,
+                                                model_type=model_type,
+                                                sensitive_features=sensitive_features.keys() if sensitive_features else []
+                                            )
+                                            if result:
+                                                model_results[model_type] = result
+                                    
+                                    # Create dummy label_encoders for compatibility
+                                    label_encoders = {}
+                                
+                                if model_results is not None and label_encoders is not None:
+                                    st.session_state.model_results = model_results
+                                    st.session_state.label_encoders = label_encoders
+                                    st.session_state.model_cache_key = cache_key
+                                    st.success(f"✅ Models trained successfully using {training_method} method!")
+                                else:
+                                    st.error("❌ Model training failed. Please check your data and try again.")
+                                    return
+                                    
+                            except Exception as e:
+                                st.error(f"❌ Error in model training: {str(e)}")
+                                st.info("Please check your data quality and try again.")
+                                return
+                        
+                        # Enhanced Bias Analysis with Azure ML
+                        if model_results:
+                            st.subheader("📊 Enhanced Bias Analysis")
+                            
+                            if AZURE_AVAILABLE and training_method == "azure":
+                                st.info("🤖 Running enhanced bias detection using Azure ML algorithms...")
+                                enhanced_bias_results = azure_ml.enhanced_bias_detection(
+                                    analyzer.data,
+                                    st.session_state.target_col,
+                                    st.session_state.selected_sensitive
+                                )
+                                
+                                # Display enhanced results
+                                if enhanced_bias_results:
+                                    col1, col2 = st.columns(2)
+                                    
+                                    with col1:
+                                        st.write("**Azure ML Bias Analysis:**")
+                                        for recommendation in enhanced_bias_results.get('recommendations', []):
+                                            st.write(f"• {recommendation}")
+                                    
+                                    with col2:
+                                        st.write("**Demographic Parity Results:**")
+                                        for feature, parity in enhanced_bias_results.get('demographic_parity', {}).items():
+                                            st.metric(f"{feature} Parity", f"{parity:.3f}")
+                                
+                            # Standard fairness metrics
+                            if FAIRLEARN_AVAILABLE:
+                                analyzer.fairness_metrics(
+                                    st.session_state.selected_sensitive,
+                                    model_results,
+                                    label_encoders
+                                )
+                            else:
+                                st.warning("⚠️ Fairlearn not available. Install with: pip install fairlearn")
+                
                 else:
-                    st.warning("⚠️ Fairlearn not available. Install with: pip install fairlearn")
+                    # Fallback to local training only
+                    st.header("🖥️ Local Model Training")
+                    
+                    cache_key = f"{st.session_state.target_col}_{str(st.session_state.selected_sensitive)}_local"
+                    
+                    if (
+                        hasattr(st.session_state, 'model_results') and 
+                        hasattr(st.session_state, 'label_encoders') and 
+                        hasattr(st.session_state, 'model_cache_key') and 
+                        st.session_state.model_cache_key == cache_key
+                    ):
+                        st.info("✅ Model already trained for current selection. Skipping retraining.")
+                        model_results = st.session_state.model_results
+                        label_encoders = st.session_state.label_encoders
+                    else:
+                        try:
+                            model_results, label_encoders = analyzer.train_models(
+                                st.session_state.target_col, 
+                                st.session_state.selected_sensitive
+                            )
+                            if model_results is not None and label_encoders is not None:
+                                st.session_state.model_results = model_results
+                                st.session_state.label_encoders = label_encoders
+                                st.session_state.model_cache_key = cache_key
+                            else:
+                                st.error("❌ Model training failed. Please check your data and try again.")
+                                return
+                        except Exception as e:
+                            st.error(f"❌ Error in model training: {str(e)}")
+                            st.info("Please check your data quality and try again.")
+                            return
+                    
+                    # Calculate fairness metrics
+                    if FAIRLEARN_AVAILABLE:
+                        analyzer.fairness_metrics(
+                            st.session_state.selected_sensitive,
+                            model_results,
+                            label_encoders
+                        )
+                    else:
+                        st.warning("⚠️ Fairlearn not available. Install with: pip install fairlearn")
             else:
                 st.warning("Please complete bias analysis first.")
         

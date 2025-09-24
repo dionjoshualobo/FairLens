@@ -162,6 +162,13 @@ pip install -r requirements.txt
 - Actionable recommendations
 - Export functionality
 
+### 7. **Azure ML Integration** (Optional)
+- Cloud-based model training with scalable compute
+- Experiment tracking and model versioning
+- Enhanced bias detection using Azure ML algorithms
+- Model registry and deployment management
+- Automated fairness monitoring and alerts
+
 ## File Structure
 
 ```
@@ -188,9 +195,16 @@ pip install -r requirements.txt
 - **Pandas/NumPy**: Data manipulation and analysis
 - **Scikit-learn**: Machine learning algorithms and metrics
 
+### Cloud & MLOps Integration
+- **Azure ML**: Cloud-based model training and experiment tracking
+- **Azure Blob Storage**: Dataset storage and management
+- **Azure Container Registry**: Docker image hosting
+- **Azure Container Instances**: Production deployment
+
 ### Fairness & Bias
 - **Fairlearn**: Microsoft's fairness toolkit
 - **Custom Bias Detection**: Advanced bias metrics and detection algorithms
+- **Azure ML Enhanced Bias Detection**: Cloud-powered fairness analysis
 
 ### Explainability
 - **SHAP**: Model-agnostic explanations
@@ -229,6 +243,33 @@ BIAS_THRESHOLDS = {
     "equalized_odds_threshold": 0.1
 }
 ```
+
+### Azure ML Configuration (Optional)
+
+To enable Azure ML features, set these environment variables:
+
+```bash
+# Azure ML Workspace Configuration
+export AZURE_SUBSCRIPTION_ID="your-subscription-id"
+export AZURE_RESOURCE_GROUP_NAME="your-resource-group"
+export AZURE_ML_WORKSPACE_NAME="your-ml-workspace"
+
+# Azure Storage Configuration
+export AZURE_STORAGE_ACCOUNT_NAME="your-storage-account"
+export AZURE_STORAGE_CONTAINER_NAME="datasets"
+
+# Service Principal Authentication (Recommended for Production)
+export AZURE_CLIENT_ID="your-client-id"
+export AZURE_CLIENT_SECRET="your-client-secret"
+export AZURE_TENANT_ID="your-tenant-id"
+```
+
+**Azure ML Features Include:**
+- **Cloud Model Training**: Scale training using Azure compute clusters
+- **Experiment Tracking**: Track and compare model experiments
+- **Model Registry**: Version and manage trained models
+- **Enhanced Bias Detection**: Advanced fairness algorithms powered by Azure ML
+- **Automated Monitoring**: Continuous bias and performance monitoring
 
 ## Key Metrics & Methods
 
