@@ -65,7 +65,7 @@ pip install -r requirements.txt
 
 # Run the application
 streamlit run main.py
-
+```
 #### For Windows Users:
 1. **Clone or download the project files**
 2. **Create a virtual environment**:
