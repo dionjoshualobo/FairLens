@@ -1,7 +1,7 @@
 # AI Model Governance & Fairness Analysis Tool
 
 ## 🌐 Live Demo
-Access the live application: **[https://fairlens-app-dion-v19.centralindia.azurecontainer.io:8501](http://fairlens-app-dion-v19.centralindia.azurecontainer.io:8501)**
+Access the live application: **[https://fairlens-app-dion-v20.centralindia.azurecontainer.io:8501](http://fairlens-app-dion-v20.centralindia.azurecontainer.io:8501)**
 
 ## Overview
 
