@@ -1992,12 +1992,6 @@ def main():
     st.title("⚖️ AI Model Governance & Fairness Analyzer")
     st.markdown("Comprehensive analysis for bias, privacy, and governance compliance")
     
-    # Show session persistence info
-    if 'session_datasets' in st.session_state and st.session_state.session_datasets:
-        st.info(f"✅ **Session Active**: {len(st.session_state.session_datasets)} dataset(s) available. Your data and selections will persist as you navigate between analysis steps.")
-    else:
-        st.warning("⚠️ **New Session**: Upload or select datasets to begin analysis. Note: All datasets and progress will be lost if you reload/refresh the page.")
-    
     # Check for optional dependencies and show installation guide
     if not SHAP_AVAILABLE:
         with st.expander("🔧 Optional Dependencies Setup", expanded=True):
@@ -2027,8 +2021,9 @@ def main():
                 storage_connected = azure_storage.blob_service_client is not None
                 if storage_connected:
                     st.success("✅ Blob Storage Connected")
-                    datasets = azure_storage.list_datasets()
-                    st.write(f"📁 {len(datasets)} datasets available")
+                    # Show session datasets count (more meaningful than total blobs)
+                    session_count = len(st.session_state.get('session_datasets', []))
+                    st.write(f"� 2 default datasets + {session_count} session uploads")
                 else:
                     st.error("❌ Blob Storage Disconnected")
                 
@@ -2042,7 +2037,7 @@ def main():
                     
                 # Show deployment URL
                 st.info("🌐 **Production URL:**")
-                st.code("http://fairlens-app-dion.centralindia.azurecontainer.io:8501")
+                st.code("http://fairlens-app-dion-v19.centralindia.azurecontainer.io:8501")
                 
             except Exception as e:
                 st.error(f"❌ Azure Status Error: {e}")
@@ -2190,9 +2185,11 @@ def main():
             for feature in sample_features:
                 st.write(feature)
                 
-            # Dynamic button text based on active dataset or default
-            if 'active_dataset' in st.session_state and st.session_state.active_dataset:
-                button_text = f"Reload {st.session_state.active_dataset['name']}"
+            # Dynamic button text based on whether this specific dataset is active
+            if ('active_dataset' in st.session_state and 
+                st.session_state.active_dataset and 
+                st.session_state.active_dataset['name'] == 'loan_data.csv'):
+                button_text = "✅ Currently Active - Reload Sample Loan Data"
                 button_type = "secondary"
             else:
                 button_text = "Load Sample Loan Data"
@@ -2259,9 +2256,11 @@ def main():
                 
             st.warning("⚠️ **Note**: This dataset is larger and more complex. Processing may take longer but provides richer analysis opportunities.")
                 
-            # Dynamic button text based on active dataset or default
-            if 'active_dataset' in st.session_state and st.session_state.active_dataset:
-                button_text = f"Reload {st.session_state.active_dataset['name']}"
+            # Dynamic button text based on whether this specific dataset is active
+            if ('active_dataset' in st.session_state and 
+                st.session_state.active_dataset and 
+                st.session_state.active_dataset['name'] == 'Loan_Default.csv'):
+                button_text = "✅ Currently Active - Reload Large Loan Default Data"
                 button_type = "secondary"
             else:
                 button_text = "Load Large Loan Default Data"

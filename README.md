@@ -1,5 +1,8 @@
 # AI Model Governance & Fairness Analysis Tool
 
+## 🌐 Live Demo
+Access the live application: **[https://fairlens-app-dion-v19.centralindia.azurecontainer.io:8501](http://fairlens-app-dion-v19.centralindia.azurecontainer.io:8501)**
+
 ## Overview
 
 This comprehensive tool provides bias detection, privacy analysis, and governance compliance for machine learning models. It's specifically designed to help organizations ensure their AI systems are fair, transparent, and compliant with regulations like GDPR, CCPA, and other privacy frameworks.
@@ -47,6 +50,21 @@ This comprehensive tool provides bias detection, privacy analysis, and governanc
 - pip (Python package manager)
 
 ### Setup with Virtual Environment (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/dionjoshualobo/FairLens.git
+cd FairLens
+
+# Create and activate virtual environment
+python -m venv fairlens-env
+source fairlens-env/bin/activate  # On Windows: fairlens-env\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the application
+streamlit run main.py
 
 #### For Windows Users:
 1. **Clone or download the project files**
